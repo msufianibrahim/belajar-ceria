@@ -65,34 +65,43 @@ test('sequence: before/after answers stay within 1–10 and are one step away', 
   });
 });
 
+const pair = (v) => v.split('+').map(Number);
+
 for (const [id, total] of [['math-bond5', 5], ['math-bond10', 10]]) {
-  test(`${id}: parts always add up to ${total}, never 0 or more than the whole`, () => {
+  test(`${id}: question pair makes ${total}; exactly one choice makes the same`, () => {
     many(id, (q) => {
-      const known = Number(q.key.split('-')[1]);
-      assert.equal(known + q.answer, total);
-      assert.ok(q.answer >= 1 && q.answer <= total - 1, `answer ${q.answer}`);
-      for (const c of q.choices) assert.ok(c.value >= 1 && c.value < total, `choice ${c.value}`);
+      const [a, b] = pair(q.key.split('-')[1]);
+      assert.equal(a + b, total);
+      const sums = q.choices.map((c) => pair(c.value).reduce((x, y) => x + y));
+      assert.equal(sums.filter((s) => s === total).length, 1, `sums ${sums}`);
+      assert.equal(pair(q.answer).reduce((x, y) => x + y), total);
     });
   });
 
-  test(`${id}: ten frame has ${total} cells with the known part filled`, () => {
+  test(`${id}: right answer is a different pair, not the same one flipped`, () => {
     many(id, (q) => {
-      const known = Number(q.key.split('-')[1]);
-      assert.equal(count(q.visual, /class="cell"/g), total);
-      assert.equal(count(q.visual, /class="dot"/g), known);
+      const [a, b] = pair(q.key.split('-')[1]);
+      const [x, y] = pair(q.answer);
+      assert.ok(!(x === a && y === b) && !(x === b && y === a), `${a}+${b} vs ${q.answer}`);
     });
   });
 
-  test(`${id}: top row fills first, dots on the same side as the known part`, () => {
+  test(`${id}: every part is at least 1, wrong pairs are 1 away from ${total}`, () => {
     many(id, (q) => {
-      const known = Number(q.key.split('-')[1]);
-      const cells = q.visual.split('class="cell"').slice(1).map((c) => (c.includes('dot') ? 1 : 0));
-      for (let r = 0; r * 5 < total; r++) {
-        const row = cells.slice(r * 5, r * 5 + 5);
-        const n = Math.max(0, Math.min(5, known - r * 5));
-        const dots = [...Array(n).fill(1), ...Array(5 - n).fill(0)];
-        assert.deepEqual(row, q.key.endsWith('L') ? dots.reverse() : dots, `${q.key} row ${r}`);
+      for (const c of q.choices) {
+        const [x, y] = pair(c.value);
+        assert.ok(x >= 1 && y >= 1, c.value);
+        assert.ok(Math.abs(x + y - total) <= 1, c.value);
       }
+    });
+  });
+
+  test(`${id}: ten frame has ${total} cells, two colours matching the pair`, () => {
+    many(id, (q) => {
+      const [a, b] = pair(q.key.split('-')[1]);
+      assert.equal(count(q.visual, /class="cell"/g), total);
+      assert.equal(count(q.visual, /class="dot a"/g), a);
+      assert.equal(count(q.visual, /class="dot b"/g), b);
     });
   });
 }

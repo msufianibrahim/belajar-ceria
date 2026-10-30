@@ -1,4 +1,4 @@
-import { rand, pick, numberChoices } from './util.js';
+import { rand, pick, shuffle, numberChoices } from './util.js';
 
 // A question is: { key, prompt (spoken), text?, visual (html), choices[{label,value}], answer, wide? }
 
@@ -18,14 +18,17 @@ const group = (it, n, goneFrom = n) =>
   `<div class="items">${Array.from({ length: n }, (_, k) =>
     `<span class="${k >= goneFrom ? 'gone' : ''}">${it.e}</span>`).join('')}</div>`;
 
-// Ten frame: `total` cells in rows of 5 with `filled` dots. The top row always fills
-// first (so 7 reads as "5 and 2"); `rightSide` packs each row's dots to the right.
-const frame = (total, filled, rightSide = false) =>
+// Ten frame: `total` cells in rows of 5; the first `a` dots in one colour, the next `b` in another.
+// Lets a child *see* "7 is 5 and 2 more" without counting one by one.
+const frame = (total, a, b = 0) =>
   `<div class="frame">${Array.from({ length: total }, (_, k) => {
-    const col = k % 5;
-    const order = k - col + (rightSide ? 4 - col : col);
-    return `<span class="cell">${order < filled ? '<i class="dot"></i>' : ''}</span>`;
+    const dot = k < a ? '<i class="dot a"></i>' : k < a + b ? '<i class="dot b"></i>' : '';
+    return `<span class="cell">${dot}</span>`;
   }).join('')}</div>`;
+
+// "x + y" with small two-colour dots underneath to count.
+const pairLabel = (x, y) =>
+  `<span class="pair"><b>${x} + ${y}</b><span class="mini">${'<i class="a"></i>'.repeat(x)}${'<i class="b"></i>'.repeat(y)}</span></span>`;
 
 const blankable = (v) => (v === '?' ? '<span class="blank">?</span>' : `<span>${v}</span>`);
 
@@ -113,18 +116,36 @@ function sequence(max) {
   };
 }
 
-// Number bond: the whole split into two parts, one part missing.
+// Number bonds: "Which is the same as 2 + 3?" -> 1 + 4. Teaches that a number can be
+// made in different ways. The right pair is never the question flipped (3 + 2), and
+// the wrong pairs total one more or one less, so the child has to check.
 function bond(total) {
-  const known = rand(1, total - 1);
-  const answer = total - known;
-  const missingLeft = Math.random() < 0.5;
-  const parts = missingLeft ? ['?', known] : [known, '?'];
-  // Dots sit on the same side as the known part.
+  const a = rand(1, total - 1);
+  const b = total - a;
+  const others = [];
+  for (let x = 1; x < total; x++) if (x !== a && x !== b) others.push(x);
+  const x = pick(others);
+  const answer = `${x}+${total - x}`;
+
+  const wrong = [];
+  while (wrong.length < 2) {
+    const sum = total + pick([-1, 1]);
+    const p = rand(1, sum - 1);
+    const v = `${p}+${sum - p}`;
+    if (!wrong.includes(v)) wrong.push(v);
+  }
+  const choices = shuffle([answer, ...wrong]).map((v) => {
+    const [p, q] = v.split('+').map(Number);
+    return { label: pairLabel(p, q), value: v };
+  });
+
   return {
-    key: `b${total}-${known}-${missingLeft ? 'L' : 'R'}`,
-    prompt: missingLeft ? `${total} ialah berapa dan ${known}?` : `${total} ialah ${known} dan berapa?`,
-    visual: `<div class="bond"><span class="whole">${total}</span><div class="parts">${parts.map(blankable).join('')}</div></div>${frame(total, known, missingLeft)}`,
-    choices: numberChoices(answer, 1, total - 1),
+    key: `b${total}-${a}+${b}-${x}`,
+    prompt: `Mana yang sama dengan ${a} tambah ${b}?`,
+    text: `${a} + ${b}`,
+    visual: frame(total, a, b),
+    wide: true,
+    choices,
     answer,
   };
 }

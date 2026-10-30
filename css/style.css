@@ -90,18 +90,21 @@ button:disabled { cursor: default; }
 .choice.right { background: var(--good); color: #fff; animation: pop .4s; }
 .choice.wrong { background: #ffe0e0; opacity: .6; animation: shake .4s; box-shadow: none; }
 .choice.picked { background: #fff3c4; }
-/* number recognition, number track, number bonds */
+/* number recognition, number track, ten frame */
 .numeral { font-size: 8rem; font-weight: 800; line-height: 1; }
 .track { display: flex; justify-content: center; gap: 14px; }
 .track span { width: 110px; height: 110px; border-radius: 22px; background: #fff3c4; display: grid; place-items: center; font-size: 3.6rem; font-weight: 800; }
-.bond { display: flex; flex-direction: column; align-items: center; gap: 22px; margin-bottom: 22px; }
-.bond span { width: 92px; height: 92px; border-radius: 50%; background: #fff3c4; display: grid; place-items: center; font-size: 3rem; font-weight: 800; }
-.bond .whole { background: var(--accent); color: #fff; }
-.bond .parts { display: flex; gap: 90px; }
-.track .blank, .bond .blank { background: #fff; border: 4px dashed var(--accent); color: var(--accent); }
+.track .blank { background: #fff; border: 4px dashed var(--accent); color: var(--accent); }
 .frame { display: grid; grid-template-columns: repeat(5, 64px); gap: 6px; padding: 6px; margin: 0 auto; width: max-content; background: #8d6e63; border-radius: 12px; }
 .frame .cell { width: 64px; height: 64px; background: #fff; border-radius: 6px; display: grid; place-items: center; }
-.frame .dot { width: 44px; height: 44px; border-radius: 50%; background: #ff7043; display: block; }
+.frame .dot { width: 44px; height: 44px; border-radius: 50%; display: block; }
+/* the two parts of a number bond, in two colours */
+.dot.a, .mini .a { background: #ff7043; }
+.dot.b, .mini .b { background: #42a5f5; }
+.pair { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.pair b { font-size: 2.6rem; }
+.mini { display: grid; grid-template-columns: repeat(5, 18px); gap: 5px; }
+.mini i { width: 18px; height: 18px; border-radius: 50%; display: block; }
 
 @keyframes pop { 50% { transform: scale(1.08); } }
 @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }

@@ -153,14 +153,15 @@ test('parent gate rejects a wrong answer', async ({ page }) => {
 
 const levelButton = (page, title) => page.locator('.level', { hasText: title });
 
-test('number bonds: shows the bond and a ten frame, and can be completed', async ({ page }) => {
+test('number bonds: a pair with a ten frame, choices are other pairs, can be completed', async ({ page }) => {
   await open(page, { placed: { math: true }, frontier: { math: 'math-bond10' } });
   await page.getByRole('button', { name: /Matematik/ }).click();
   await levelButton(page, 'Pasangan 10').click();
 
-  await expect(page.locator('.bond .whole')).toHaveText('10');
-  await expect(page.locator('.bond .blank')).toHaveCount(1);
+  await expect(page.locator('.qtext')).toHaveText(/^\d \+ \d$/);
+  await expect(page.locator('.speak')).toContainText('Mana yang sama dengan');
   await expect(page.locator('.frame .cell')).toHaveCount(10);
+  await expect(page.locator('.choice .pair')).toHaveCount(3);
   for (let i = 0; i < 5; i++) await answerRight(page);
   await expect(page.locator('.results h1')).toContainText('Hebat! Semua betul!');
 });
