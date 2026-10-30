@@ -80,7 +80,12 @@ button:disabled { cursor: default; }
 .sum b { font-size: 3rem; }
 .sum .items { font-size: 48px; max-width: 260px; margin: 0; }
 .qtext { font-size: 2.4rem; font-weight: 800; margin-top: 10px; }
-.speak { align-self: center; margin-top: 14px; background: #fff3c4; border-radius: 999px; padding: 10px 20px; font-size: 1.2rem; }
+.speak .zh, .speak .py, .speak .sub { display: block; }
+.speak .zh { font-size: 1.8rem; font-weight: 700; }
+.speak .py { font-size: 1.1rem; color: #8a6d3b; }
+.speak .sub { font-size: .95rem; color: #0008; margin-top: 4px; }
+.tag { display: inline-block; vertical-align: middle; font-size: .8rem; font-weight: 700; color: #fff; background: #e53935; border-radius: 8px; padding: 2px 8px; }
+.speak { align-self: center; margin-top: 14px; background: #fff3c4; border-radius: 24px; padding: 10px 20px; font-size: 1.2rem; }
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
 .choices.wide { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 .choice { background: #fff; border-radius: var(--radius); min-height: 150px; padding: 12px; font-size: 4rem; font-weight: 800; box-shadow: 0 6px 0 #0002; }

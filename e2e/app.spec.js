@@ -182,3 +182,45 @@ test('old saves keep the same level open after the new levels were added', async
   await expect(levelButton(page, 'Tolak hingga 5')).toBeDisabled();
   await expect(levelButton(page, 'Pasangan 5')).toBeEnabled(); // new level before it is open too
 });
+
+const masteredCount5 = {
+  placed: { math: true },
+  frontier: { math: 'math-count10' },
+  levels: { 'math-count5': { best: 5, cleared: true, perfectDays: ['a', 'b', 'c'], mastered: true } },
+};
+
+test('Mandarin on mastered levels: characters, pinyin, English subtitle', async ({ page }) => {
+  await open(page, masteredCount5);
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await expect(levelButton(page, 'Kira 1–5').locator('.tag')).toHaveText('华文');
+  await expect(levelButton(page, 'Kenal nombor').locator('.tag')).toHaveCount(0);
+
+  await levelButton(page, 'Kira 1–5').click();
+  await expect(page.locator('.speak .zh')).toContainText('有几');
+  await expect(page.locator('.speak .py')).toContainText('yǒu jǐ');
+  await expect(page.locator('.speak .sub')).toContainText('How many');
+});
+
+test('new levels stay in BM by default', async ({ page }) => {
+  await open(page, masteredCount5);
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Kenal nombor').click();
+  await expect(page.locator('.speak .zh')).toHaveCount(0);
+  await expect(page.locator('.speak')).toContainText('Mana ada');
+});
+
+test('parent can turn Mandarin off and switch the base language to English', async ({ page }) => {
+  await open(page, masteredCount5);
+  await page.getByRole('button', { name: 'Ibu bapa' }).click();
+  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
+  await page.locator('.gate input').fill(String(a * b));
+  await page.getByRole('button', { name: 'Masuk' }).click();
+  await page.locator('select[data-setting="mandarin"]').selectOption('off');
+  await page.locator('select[data-setting="mathLang"]').selectOption('en');
+  await page.getByRole('button', { name: 'Kembali' }).click();
+
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Kira 1–5').click();
+  await expect(page.locator('.speak .zh')).toHaveCount(0);
+  await expect(page.locator('.speak')).toContainText('How many');
+});

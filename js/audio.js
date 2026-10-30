@@ -12,6 +12,10 @@ if (hasTts) {
 function pickVoice(lang) {
   const norm = (l) => l.replace('_', '-').toLowerCase();
   const base = lang.split('-')[0];
+  // Mandarin only: never fall back to a Cantonese (zh-HK) voice.
+  if (base === 'zh') {
+    return voices.find((v) => norm(v.lang) === 'zh-cn') || voices.find((v) => /^(zh-(tw|sg)|cmn)/.test(norm(v.lang)));
+  }
   return (
     voices.find((v) => norm(v.lang) === lang.toLowerCase()) ||
     voices.find((v) => norm(v.lang).startsWith(base)) ||

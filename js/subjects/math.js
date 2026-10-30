@@ -1,16 +1,18 @@
 import { rand, pick, shuffle, numberChoices } from './util.js';
+import { py, zhCount } from '../lang.js';
 
-// A question is: { key, prompt (spoken), text?, visual (html), choices[{label,value}], answer, wide? }
+// A question is: { key, prompt: { ms, en, zh, py }, text?, visual (html), choices[{label,value}], answer, wide? }
 
+// n: Malay, en/pl: English singular/plural, zh/py: Mandarin + pinyin, mw: measure word.
 const THINGS = [
-  { e: '🍎', n: 'epal' },
-  { e: '🍌', n: 'pisang' },
-  { e: '🐟', n: 'ikan' },
-  { e: '⭐', n: 'bintang' },
-  { e: '🐱', n: 'kucing' },
-  { e: '🚗', n: 'kereta' },
-  { e: '🎈', n: 'belon' },
-  { e: '🐥', n: 'anak ayam' },
+  { e: '🍎', n: 'epal', en: 'apple', pl: 'apples', zh: '苹果', py: 'píngguǒ', mw: '个', mwpy: 'gè' },
+  { e: '🍌', n: 'pisang', en: 'banana', pl: 'bananas', zh: '香蕉', py: 'xiāngjiāo', mw: '根', mwpy: 'gēn' },
+  { e: '🐟', n: 'ikan', en: 'fish', pl: 'fish', zh: '鱼', py: 'yú', mw: '条', mwpy: 'tiáo' },
+  { e: '⭐', n: 'bintang', en: 'star', pl: 'stars', zh: '星星', py: 'xīngxing', mw: '颗', mwpy: 'kē' },
+  { e: '🐱', n: 'kucing', en: 'cat', pl: 'cats', zh: '猫', py: 'māo', mw: '只', mwpy: 'zhī' },
+  { e: '🚗', n: 'kereta', en: 'car', pl: 'cars', zh: '汽车', py: 'qìchē', mw: '辆', mwpy: 'liàng' },
+  { e: '🎈', n: 'belon', en: 'balloon', pl: 'balloons', zh: '气球', py: 'qìqiú', mw: '个', mwpy: 'gè' },
+  { e: '🐥', n: 'anak ayam', en: 'chick', pl: 'chicks', zh: '小鸡', py: 'xiǎojī', mw: '只', mwpy: 'zhī' },
 ];
 
 // `goneFrom`: items at this index and after are shown crossed out (for subtraction).
@@ -37,7 +39,12 @@ function count(min, max) {
   const it = pick(THINGS);
   return {
     key: `c${n}${it.e}`,
-    prompt: `Berapa banyak ${it.n}?`,
+    prompt: {
+      ms: `Berapa banyak ${it.n}?`,
+      en: `How many ${it.pl}?`,
+      zh: `有几${it.mw}${it.zh}？`,
+      py: `yǒu jǐ ${it.mwpy} ${it.py}?`,
+    },
     visual: group(it, n),
     choices: numberChoices(n, 1, max),
     answer: n,
@@ -51,7 +58,12 @@ function compare(max) {
   const it = pick(THINGS);
   return {
     key: `m${a}-${b}`,
-    prompt: `Mana lebih banyak ${it.n}?`,
+    prompt: {
+      ms: `Mana lebih banyak ${it.n}?`,
+      en: `Which side has more ${it.pl}?`,
+      zh: `哪边的${it.zh}比较多？`,
+      py: `nǎ biān de ${it.py} bǐjiào duō?`,
+    },
     visual: '',
     wide: true,
     choices: [{ label: group(it, a), value: a }, { label: group(it, b), value: b }],
@@ -65,7 +77,12 @@ function add(max) {
   const it = pick(THINGS);
   return {
     key: `a${a}+${b}`,
-    prompt: `${a} tambah ${b}, jadi berapa?`,
+    prompt: {
+      ms: `${a} tambah ${b}, jadi berapa?`,
+      en: `${a} plus ${b} makes how many?`,
+      zh: `${a}加${b}等于几？`,
+      py: `${py(a)} jiā ${py(b)} děngyú jǐ?`,
+    },
     text: `${a} + ${b} = ?`,
     visual: `<div class="sum">${group(it, a)}<b>+</b>${group(it, b)}</div>`,
     choices: numberChoices(a + b, 2, max),
@@ -79,7 +96,12 @@ function subtract(max) {
   const it = pick(THINGS);
   return {
     key: `s${a}-${b}`,
-    prompt: `${a} tolak ${b}, tinggal berapa?`,
+    prompt: {
+      ms: `${a} tolak ${b}, tinggal berapa?`,
+      en: `${a} take away ${b} leaves how many?`,
+      zh: `${a}减${b}等于几？`,
+      py: `${py(a)} jiǎn ${py(b)} děngyú jǐ?`,
+    },
     text: `${a} − ${b} = ?`,
     visual: group(it, a, a - b),
     choices: numberChoices(a - b, 1, max - 1),
@@ -91,9 +113,15 @@ function subtract(max) {
 function numeral(max) {
   const n = rand(1, max);
   const it = pick(THINGS);
+  const [zn, zp] = zhCount(n);
   return {
     key: `n${n}`,
-    prompt: `Mana ada ${n} ${it.n}?`,
+    prompt: {
+      ms: `Mana ada ${n} ${it.n}?`,
+      en: `Which group has ${n} ${n === 1 ? it.en : it.pl}?`,
+      zh: `哪组有${zn}${it.mw}${it.zh}？`,
+      py: `nǎ zǔ yǒu ${zp} ${it.mwpy} ${it.py}?`,
+    },
     visual: `<div class="numeral">${n}</div>`,
     wide: true,
     choices: numberChoices(n, 1, max).map((c) => ({ label: group(it, c.value), value: c.value })),
@@ -109,7 +137,9 @@ function sequence(max) {
   const cells = (after ? [n - 1, n, '?'] : ['?', n, n + 1]).filter((c) => c === '?' || (c >= 1 && c <= max));
   return {
     key: `q${after ? 'a' : 'b'}${n}`,
-    prompt: after ? `Selepas ${n}, nombor apa?` : `Sebelum ${n}, nombor apa?`,
+    prompt: after
+      ? { ms: `Selepas ${n}, nombor apa?`, en: `What comes after ${n}?`, zh: `${n}的后面是几？`, py: `${py(n)} de hòumiàn shì jǐ?` }
+      : { ms: `Sebelum ${n}, nombor apa?`, en: `What comes before ${n}?`, zh: `${n}的前面是几？`, py: `${py(n)} de qiánmiàn shì jǐ?` },
     visual: `<div class="track">${cells.map(blankable).join('')}</div>`,
     choices: numberChoices(answer, 1, max),
     answer,
@@ -141,7 +171,12 @@ function bond(total) {
 
   return {
     key: `b${total}-${a}+${b}-${x}`,
-    prompt: `Mana yang sama dengan ${a} tambah ${b}?`,
+    prompt: {
+      ms: `Mana yang sama dengan ${a} tambah ${b}?`,
+      en: `Which is the same as ${a} plus ${b}?`,
+      zh: `哪个和${a}加${b}一样？`,
+      py: `nǎge hé ${py(a)} jiā ${py(b)} yíyàng?`,
+    },
     text: `${a} + ${b}`,
     visual: frame(total, a, b),
     wide: true,

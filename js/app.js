@@ -6,6 +6,7 @@ import { topIndex, openUpTo } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
+import { questionLang, VOICE, PRAISE, RETRY } from './lang.js';
 
 const ROUND = 5;                // questions per round
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
@@ -20,7 +21,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const subjectById = (id) => SUBJECTS.find((s) => s.id === id);
 const shopItem = (id) => SHOP.find((i) => i.id === id);
 const persist = () => save(state);
-const say = (text) => state.settings.voice && speak(text);
+const say = (text, lang = 'ms') => state.settings.voice && speak(text, VOICE[lang]);
 const clock = (ms) => new Date(ms).toLocaleTimeString('ms-MY', { hour: 'numeric', minute: '2-digit' });
 
 // ---------------------------------------------------------------- session limit
@@ -113,9 +114,10 @@ function subjectScreen() {
     const r = state.levels[l.id];
     const locked = i > top;
     const badge = locked ? '🔒' : r?.mastered ? '👑' : i + 1;
+    const zh = !locked && questionLang(state, l.id) === 'zh' ? '<span class="tag">华文</span>' : '';
     return `<li><button class="level ${locked ? 'locked' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
-      <span class="lvl-title">${l.icon} ${l.title}</span>
+      <span class="lvl-title">${l.icon} ${l.title} ${zh}</span>
       <span class="stars">${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
@@ -132,7 +134,7 @@ function questionScreen() {
     <div class="question">
       ${q.visual ? `<div class="visual">${q.visual}</div>` : ''}
       ${q.text ? `<div class="qtext">${q.text}</div>` : ''}
-      <button class="speak" data-act="say">🔊 ${esc(q.prompt)}</button>
+      <button class="speak" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
     </div>
     <div class="choices ${q.wide ? 'wide' : ''}">
       ${q.choices.map((c, k) => `<button class="choice" data-act="answer" data-arg="${k}">${c.label}</button>`).join('')}
@@ -225,6 +227,8 @@ function gateScreen() {
 function parentScreen() {
   const s = state.session;
   const resting = s.restUntil > Date.now();
+  const textSelect = (key, opts) => `<select data-setting="${key}" data-kind="text">${opts.map(([v, label]) =>
+    `<option value="${v}" ${state.settings[key] === v ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
   const select = (key, vals) => `<select data-setting="${key}">${vals.map((v) =>
     `<option value="${v}" ${state.settings[key] === v ? 'selected' : ''}>${v} minit</option>`).join('')}</select>`;
   const progress = SUBJECTS.filter((sub) => sub.levels.length).map((sub) => `
@@ -251,6 +255,11 @@ function parentScreen() {
       ${resting ? '<button class="btn" data-act="endRest">Tamatkan rehat sekarang</button>' : ''}
       <label>Suara arahan <input type="checkbox" data-setting="voice" ${state.settings.voice ? 'checked' : ''}></label>
     </section>
+    <section class="panel"><h3>Bahasa Matematik</h3>
+      <label>Bahasa soalan ${textSelect('mathLang', [['ms', 'BM'], ['en', 'English']])}</label>
+      <label>华文 (Mandarin) ${textSelect('mandarin', [['off', 'Tutup'], ['mastered', 'Tahap 👑 sahaja'], ['all', 'Semua tahap']])}</label>
+      <p class="muted">Tahap 👑 sahaja: soalan dalam 华文 + pinyin + sari kata English untuk tahap yang sudah mahir, supaya hanya bahasa yang baru.</p>
+    </section>
     <section class="panel"><h3>Hadiah dunia sebenar</h3>
       <p class="muted">Beri pelekat bila anak buat aktiviti ini bersama anda.</p>${tasks}
     </section>
@@ -266,7 +275,14 @@ function parentScreen() {
 // ---------------------------------------------------------------- rounds
 
 const currentQ = () => (view.name === 'play' ? view.qs[view.i] : view.q);
-const sayQuestion = () => say(currentQ().prompt);
+const currentLang = () => questionLang(state, subjectById(view.subjectId).levels[view.levelIdx].id);
+const sayQuestion = () => say(currentQ().prompt[currentLang()], currentLang());
+
+// Mandarin shows characters, pinyin, and an English subtitle.
+function promptHtml(p, lang) {
+  if (lang !== 'zh') return esc(p[lang]);
+  return `<span class="zh">${esc(p.zh)}</span><span class="py">${esc(p.py)}</span><span class="sub">${esc(p.en)}</span>`;
+}
 
 function startRound(subjectId, levelIdx) {
   const level = subjectById(subjectId).levels[levelIdx];
@@ -279,7 +295,7 @@ function startRound(subjectId, levelIdx) {
 function startPlacement(subjectId) {
   const first = subjectById(subjectId).levels[0];
   const ok = go('placement', { subjectId, levelIdx: 0, step: 0, correct: 0, q: first.gen(), busy: false });
-  if (ok) say(`Jom main! ${view.q.prompt}`);
+  if (ok) sayQuestion();
 }
 
 function placementAnswer(right, el) {
@@ -324,7 +340,7 @@ function answer(k, el) {
     el.classList.add('wrong');
     el.disabled = true;
     chime('wrong');
-    say('Cuba lagi');
+    say(RETRY[currentLang()], currentLang());
     return;
   }
 
@@ -332,7 +348,7 @@ function answer(k, el) {
   v.busy = true;
   el.classList.add('right');
   chime('right');
-  say(pick(['Betul!', 'Pandai!', 'Bagus!']));
+  say(pick(PRAISE[currentLang()]), currentLang());
   if (!v.missed) v.score++; // only first-try answers count toward the score
   setTimeout(() => {
     if (view !== v) return;
@@ -460,7 +476,7 @@ app.addEventListener('submit', (e) => {
 app.addEventListener('change', (e) => {
   const t = e.target;
   if (t.dataset.setting) {
-    state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : Number(t.value);
+    state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : t.dataset.kind === 'text' ? t.value : Number(t.value);
     persist();
   } else if (t.id === 'child-name') {
     state.childName = t.value.trim().slice(0, 20);

@@ -10,7 +10,7 @@ test('every math question has its answer among distinct choices', () => {
       const values = q.choices.map((c) => c.value);
       assert.ok(values.includes(q.answer), `${level.id}: answer ${q.answer} missing from ${values}`);
       assert.equal(new Set(values).size, values.length, `${level.id}: duplicate choices ${values}`);
-      assert.ok(q.prompt && q.key);
+      assert.ok(q.key);
     }
   }
 });
@@ -59,8 +59,8 @@ test('numerals: the number shown matches the group it asks for', () => {
 test('sequence: before/after answers stay within 1–10 and are one step away', () => {
   many('math-sequence', (q) => {
     assert.ok(q.answer >= 1 && q.answer <= 10, `answer ${q.answer}`);
-    const n = Number(q.prompt.match(/\d+/)[0]);
-    assert.equal(q.answer, q.prompt.startsWith('Selepas') ? n + 1 : n - 1);
+    const n = Number(q.prompt.ms.match(/\d+/)[0]);
+    assert.equal(q.answer, q.prompt.ms.startsWith('Selepas') ? n + 1 : n - 1);
     assert.equal(count(q.visual, /\?/g), 1, 'exactly one blank');
   });
 });
@@ -110,4 +110,23 @@ test('every level in every subject has a unique sticker', async () => {
   const { SUBJECTS } = await import('../js/subjects/index.js');
   const ids = SUBJECTS.flatMap((s) => s.levels.map((l) => l.sticker.id));
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test('every question has BM, English, Mandarin and pinyin prompts', () => {
+  for (const level of math.levels) {
+    for (let n = 0; n < 200; n++) {
+      const { prompt: p } = level.gen();
+      for (const k of ['ms', 'en', 'zh', 'py']) assert.ok(typeof p[k] === 'string' && p[k].length > 3, `${level.id} ${k}`);
+      assert.match(p.zh, /[\u4e00-\u9fff]/, `${level.id} zh has characters`);
+      assert.doesNotMatch(p.py, /[\u4e00-\u9fff]/, `${level.id} pinyin has no characters`);
+      assert.doesNotMatch(p.en, / 1 [a-z]+s\?/, `${level.id} singular for 1: ${p.en}`);
+    }
+  }
+});
+
+test('numerals: Mandarin says 两 for 2', () => {
+  for (let n = 0; n < 300; n++) {
+    const q = level('math-numerals').gen();
+    if (q.answer === 2) assert.match(q.prompt.zh, /两/);
+  }
 });
