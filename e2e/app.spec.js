@@ -40,8 +40,8 @@ test('home: Math is open, other subjects are coming soon', async ({ page }) => {
 test('placement: a child who gets everything right starts at the top level', async ({ page }) => {
   await open(page);
   await page.getByRole('button', { name: /Matematik/ }).click();
-  for (let i = 0; i < 12; i++) await answerRight(page); // 6 levels × 2 questions
-  await expect(page.locator('.level:not(.locked)')).toHaveCount(6);
+  for (let i = 0; i < 20; i++) await answerRight(page); // 10 levels × 2 questions
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(10);
 });
 
 test('placement: a child who misses early starts at level 1, with no "wrong" shown', async ({ page }) => {
@@ -149,4 +149,35 @@ test('parent gate rejects a wrong answer', async ({ page }) => {
   await page.getByRole('button', { name: 'Masuk' }).click();
   await expect(page.locator('.gate input')).toHaveAttribute('placeholder', 'Cuba lagi');
   await expect(page.locator('.panel')).toHaveCount(0);
+});
+
+const levelButton = (page, title) => page.locator('.level', { hasText: title });
+
+test('number bonds: shows the bond and a ten frame, and can be completed', async ({ page }) => {
+  await open(page, { placed: { math: true }, frontier: { math: 'math-bond10' } });
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Pasangan 10').click();
+
+  await expect(page.locator('.bond .whole')).toHaveText('10');
+  await expect(page.locator('.bond .blank')).toHaveCount(1);
+  await expect(page.locator('.frame .cell')).toHaveCount(10);
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await expect(page.locator('.results h1')).toContainText('Hebat! Semua betul!');
+});
+
+test('number recognition: choices are picture groups', async ({ page }) => {
+  await open(page, { placed: { math: true }, frontier: { math: 'math-numerals' } });
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Kenal nombor').click();
+  await expect(page.locator('.numeral')).toBeVisible();
+  await expect(page.locator('.choice .items')).toHaveCount(3);
+});
+
+test('old saves keep the same level open after the new levels were added', async ({ page }) => {
+  // Old format: highest unlocked level saved by position. 3 was "Tambah hingga 5".
+  await open(page, { placed: { math: true }, unlocked: { math: 3 } });
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await expect(levelButton(page, 'Tambah hingga 5')).toBeEnabled();
+  await expect(levelButton(page, 'Tolak hingga 5')).toBeDisabled();
+  await expect(levelButton(page, 'Pasangan 5')).toBeEnabled(); // new level before it is open too
 });

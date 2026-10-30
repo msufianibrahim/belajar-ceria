@@ -1,4 +1,6 @@
 // All progress lives in localStorage on the tablet. No server, no account.
+import { migrate } from './progress.js';
+
 const KEY = 'belajar-ceria-v1';
 
 const defaults = () => ({
@@ -8,7 +10,7 @@ const defaults = () => ({
   owned: ['c-yellow'],          // shop item ids
   equipped: { color: 'c-yellow', hat: null, pet: null },
   levels: {},                   // levelId -> { best, cleared, perfectDays[], mastered }
-  unlocked: {},                 // subjectId -> highest unlocked level index
+  frontier: {},                 // subjectId -> furthest open level id (see progress.js)
   placed: {},                   // subjectId -> true once placement is done
   settings: { sessionMinutes: 20, restMinutes: 60, voice: true },
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
@@ -23,7 +25,8 @@ function merge(base, saved) {
   return base;
 }
 
-export const fromJson = (data) => merge(defaults(), data);
+// Also upgrades older saves and backup files to the current format.
+export const fromJson = (data) => migrate(merge(defaults(), data));
 
 export function load() {
   try {

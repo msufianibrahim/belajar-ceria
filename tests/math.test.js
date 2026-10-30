@@ -32,3 +32,73 @@ test('level and sticker ids are unique', () => {
   const ids = math.levels.flatMap((l) => [l.id, l.sticker.id]);
   assert.equal(new Set(ids).size, ids.length);
 });
+
+const level = (id) => {
+  const l = math.levels.find((x) => x.id === id);
+  assert.ok(l, `level ${id} exists`);
+  return l;
+};
+const many = (id, fn) => { for (let n = 0; n < 500; n++) fn(level(id).gen()); };
+const count = (html, re) => (html.match(re) || []).length;
+
+test('the learning path is in the agreed order', () => {
+  assert.deepEqual(math.levels.map((l) => l.id), [
+    'math-count5', 'math-numerals', 'math-count10', 'math-compare', 'math-sequence',
+    'math-bond5', 'math-add5', 'math-sub5', 'math-bond10', 'math-add10',
+  ]);
+});
+
+test('numerals: the number shown matches the group it asks for', () => {
+  many('math-numerals', (q) => {
+    assert.ok(q.answer >= 1 && q.answer <= 10);
+    assert.match(q.visual, new RegExp(`>${q.answer}<`));
+    for (const c of q.choices) assert.equal(count(c.label, /<span/g), c.value, 'group size = choice value');
+  });
+});
+
+test('sequence: before/after answers stay within 1–10 and are one step away', () => {
+  many('math-sequence', (q) => {
+    assert.ok(q.answer >= 1 && q.answer <= 10, `answer ${q.answer}`);
+    const n = Number(q.prompt.match(/\d+/)[0]);
+    assert.equal(q.answer, q.prompt.startsWith('Selepas') ? n + 1 : n - 1);
+    assert.equal(count(q.visual, /\?/g), 1, 'exactly one blank');
+  });
+});
+
+for (const [id, total] of [['math-bond5', 5], ['math-bond10', 10]]) {
+  test(`${id}: parts always add up to ${total}, never 0 or more than the whole`, () => {
+    many(id, (q) => {
+      const known = Number(q.key.split('-')[1]);
+      assert.equal(known + q.answer, total);
+      assert.ok(q.answer >= 1 && q.answer <= total - 1, `answer ${q.answer}`);
+      for (const c of q.choices) assert.ok(c.value >= 1 && c.value < total, `choice ${c.value}`);
+    });
+  });
+
+  test(`${id}: ten frame has ${total} cells with the known part filled`, () => {
+    many(id, (q) => {
+      const known = Number(q.key.split('-')[1]);
+      assert.equal(count(q.visual, /class="cell"/g), total);
+      assert.equal(count(q.visual, /class="dot"/g), known);
+    });
+  });
+
+  test(`${id}: top row fills first, dots on the same side as the known part`, () => {
+    many(id, (q) => {
+      const known = Number(q.key.split('-')[1]);
+      const cells = q.visual.split('class="cell"').slice(1).map((c) => (c.includes('dot') ? 1 : 0));
+      for (let r = 0; r * 5 < total; r++) {
+        const row = cells.slice(r * 5, r * 5 + 5);
+        const n = Math.max(0, Math.min(5, known - r * 5));
+        const dots = [...Array(n).fill(1), ...Array(5 - n).fill(0)];
+        assert.deepEqual(row, q.key.endsWith('L') ? dots.reverse() : dots, `${q.key} row ${r}`);
+      }
+    });
+  });
+}
+
+test('every level in every subject has a unique sticker', async () => {
+  const { SUBJECTS } = await import('../js/subjects/index.js');
+  const ids = SUBJECTS.flatMap((s) => s.levels.map((l) => l.sticker.id));
+  assert.equal(new Set(ids).size, ids.length);
+});

@@ -1,0 +1,53 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { migrate, topIndex, openUpTo } from '../js/progress.js';
+import { fromJson } from '../js/storage.js';
+import math from '../js/subjects/math.js';
+
+const idx = (id) => math.levels.findIndex((l) => l.id === id);
+
+test('a new child has only the first level open', () => {
+  assert.equal(topIndex(fromJson({}), math), 0);
+});
+
+test('opening a level opens everything before it', () => {
+  const s = fromJson({});
+  openUpTo(s, math, 3);
+  assert.equal(topIndex(s, math), 3);
+});
+
+test('opening never moves backwards', () => {
+  const s = fromJson({});
+  openUpTo(s, math, 5);
+  openUpTo(s, math, 2);
+  assert.equal(topIndex(s, math), 5);
+});
+
+test('opening past the last level stops at the last level', () => {
+  const s = fromJson({});
+  openUpTo(s, math, 99);
+  assert.equal(topIndex(s, math), math.levels.length - 1);
+});
+
+test('progress is saved by level id, so inserting levels does not shift it', () => {
+  const s = fromJson({});
+  openUpTo(s, math, idx('math-add5'));
+  assert.equal(s.frontier.math, 'math-add5');
+});
+
+test('old saves (index-based) keep the same level open after the new levels were added', () => {
+  // Old order: count5, count10, compare, add5, add10, sub5. Index 3 = "Tambah hingga 5".
+  const s = fromJson({ unlocked: { math: 3 } });
+  assert.equal(s.unlocked, undefined, 'legacy field removed');
+  assert.equal(s.frontier.math, 'math-add5');
+  assert.equal(topIndex(s, math), idx('math-add5'));
+});
+
+test('migration leaves new-format saves alone', () => {
+  const s = migrate({ frontier: { math: 'math-bond10' } });
+  assert.deepEqual(s.frontier, { math: 'math-bond10' });
+});
+
+test('an unknown saved level id falls back to the first level', () => {
+  assert.equal(topIndex(fromJson({ frontier: { math: 'math-removed' } }), math), 0);
+});

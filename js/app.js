@@ -2,6 +2,7 @@ import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
 import { settleRound, MASTERY_DAYS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
+import { topIndex, openUpTo } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
@@ -107,7 +108,7 @@ function homeScreen() {
 
 function subjectScreen() {
   const s = subjectById(view.subjectId);
-  const top = state.unlocked[s.id] ?? 0;
+  const top = topIndex(state, s);
   const items = s.levels.map((l, i) => {
     const r = state.levels[l.id];
     const locked = i > top;
@@ -298,7 +299,7 @@ function placementAnswer(right, el) {
         v.correct = 0;
       } else {
         state.placed[s.id] = true;
-        state.unlocked[s.id] = Math.max(state.unlocked[s.id] ?? 0, v.levelIdx);
+        openUpTo(state, s, v.levelIdx);
         persist();
         if (go('subject', { subjectId: s.id })) say('Hebat! Jom mula belajar!');
         return;
@@ -346,9 +347,7 @@ function finishRound() {
   const s = subjectById(view.subjectId);
   const level = s.levels[view.levelIdx];
   const res = settleRound(state, level, view.score, view.qs.length, todayKey());
-  if (res.passed) {
-    state.unlocked[s.id] = Math.max(state.unlocked[s.id] ?? 0, Math.min(view.levelIdx + 1, s.levels.length - 1));
-  }
+  if (res.passed) openUpTo(state, s, view.levelIdx + 1);
   persist();
   go('results', { subjectId: s.id, levelIdx: view.levelIdx, res, retries: view.retries });
   say(resultTitle(res));
