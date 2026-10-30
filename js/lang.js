@@ -11,10 +11,10 @@ export function questionLang(state, levelId) {
 }
 
 const PINYIN = ['líng', 'yī', 'èr', 'sān', 'sì', 'wǔ', 'liù', 'qī', 'bā', 'jiǔ', 'shí'];
-export const py = (n) => PINYIN[n];
+export const py = (n) => (n <= 10 ? PINYIN[n] : n < 20 ? `shí${PINYIN[n - 10]}` : 'èrshí');
 
 // A number before a measure word: 2 is 两 (liǎng), not 二. Other numbers stay as digits.
-export const zhCount = (n) => (n === 2 ? ['两', 'liǎng'] : [String(n), PINYIN[n]]);
+export const zhCount = (n) => (n === 2 ? ['两', 'liǎng'] : [String(n), py(n)]);
 
 export const PRAISE = {
   ms: ['Betul!', 'Pandai!', 'Bagus!'],

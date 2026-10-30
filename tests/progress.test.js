@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate, topIndex, openUpTo } from '../js/progress.js';
+import { migrate, topIndex, openUpTo, pickReview } from '../js/progress.js';
 import { fromJson } from '../js/storage.js';
 import math from '../js/subjects/math.js';
 
@@ -50,4 +50,33 @@ test('migration leaves new-format saves alone', () => {
 
 test('an unknown saved level id falls back to the first level', () => {
   assert.equal(topIndex(fromJson({ frontier: { math: 'math-removed' } }), math), 0);
+});
+
+const rec = (extra) => ({ best: 4, cleared: true, perfectDays: [], mastered: false, ...extra });
+const review = (levels, today = 'd9') => pickReview(fromJson({ levels }), [math], today);
+
+test('review: nothing to review when no level is passed', () => {
+  assert.equal(review({}), null);
+});
+
+test('review: picks the passed level practised longest ago', () => {
+  const r = review({
+    'math-count5': rec({ lastPlayed: 'd5' }),
+    'math-count10': rec({ lastPlayed: 'd2' }),
+    'math-add5': rec({ lastPlayed: 'd7' }),
+  });
+  assert.deepEqual(r, { subjectId: 'math', levelIdx: idx('math-count10') });
+});
+
+test('review: skips mastered levels and levels already perfect today', () => {
+  const r = review({
+    'math-count5': rec({ mastered: true, lastPlayed: 'd1' }),
+    'math-count10': rec({ perfectDays: ['d9'], lastPlayed: 'd9' }),
+    'math-add5': rec({ lastPlayed: 'd8' }),
+  });
+  assert.deepEqual(r, { subjectId: 'math', levelIdx: idx('math-add5') });
+});
+
+test('review: skips levels not passed yet', () => {
+  assert.equal(review({ 'math-count5': rec({ cleared: false, lastPlayed: 'd1' }) }), null);
 });

@@ -28,3 +28,19 @@ export function openUpTo(state, subject, i) {
   const target = Math.min(i, subject.levels.length - 1);
   if (target > topIndex(state, subject)) state.frontier[subject.id] = subject.levels[target].id;
 }
+
+// "Ulang kaji": a passed but not yet mastered level, the one practised longest ago.
+// Skips levels already perfect today, since a second perfect round today
+// wouldn't count toward mastery.
+export function pickReview(state, subjects, today) {
+  let best = null;
+  for (const subject of subjects) {
+    subject.levels.forEach((l, levelIdx) => {
+      const r = state.levels[l.id];
+      if (!r?.cleared || r.mastered || r.perfectDays.includes(today)) return;
+      const last = r.lastPlayed ?? '';
+      if (!best || last < best.last) best = { subjectId: subject.id, levelIdx, last };
+    });
+  }
+  return best && { subjectId: best.subjectId, levelIdx: best.levelIdx };
+}

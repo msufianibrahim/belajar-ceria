@@ -40,8 +40,8 @@ test('home: Math is open, other subjects are coming soon', async ({ page }) => {
 test('placement: a child who gets everything right starts at the top level', async ({ page }) => {
   await open(page);
   await page.getByRole('button', { name: /Matematik/ }).click();
-  for (let i = 0; i < 20; i++) await answerRight(page); // 10 levels × 2 questions
-  await expect(page.locator('.level:not(.locked)')).toHaveCount(10);
+  for (let i = 0; i < 18; i++) await answerRight(page); // 9 main levels × 2 questions
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(16);
 });
 
 test('placement: a child who misses early starts at level 1, with no "wrong" shown', async ({ page }) => {
@@ -223,4 +223,37 @@ test('parent can turn Mandarin off and switch the base language to English', asy
   await levelButton(page, 'Kira 1–5').click();
   await expect(page.locator('.speak .zh')).toHaveCount(0);
   await expect(page.locator('.speak')).toContainText('How many');
+});
+
+test('subtraction within 20: written sum, crossed-out dots, can be completed', async ({ page }) => {
+  await open(page, { placed: { math: true }, frontier: { math: 'math-sub20' } });
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Tolak hingga 20').click();
+  await expect(page.locator('.qtext')).toHaveText(/^1\d|20 − \d = \?$/);
+  await expect(page.locator('.frames .frame')).toHaveCount(2);
+  await expect(page.locator('.dot.gone').first()).toBeVisible();
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await expect(page.locator('.results h1')).toContainText('Hebat! Semua betul!');
+});
+
+test('mastery progress shows on passed levels; Ulang kaji replays the oldest one', async ({ page }) => {
+  await open(page, {
+    placed: { math: true },
+    frontier: { math: 'math-less' },
+    levels: {
+      'math-count5': { best: 5, cleared: true, perfectDays: ['2026-01-01'], mastered: false, lastPlayed: '2026-01-05' },
+      'math-less': { best: 4, cleared: true, perfectDays: [], mastered: false, lastPlayed: '2026-01-02' },
+    },
+  });
+  await page.getByRole('button', { name: /Ulang kaji/ }).click();
+  await expect(page.locator('.line .here')).toBeVisible(); // a "Kurang 1, kurang 2" question
+
+  await page.getByRole('button', { name: 'Kembali' }).click();
+  await expect(levelButton(page, 'Kira 1–5').locator('.tag.gold')).toHaveText('👑 1/3');
+  await expect(levelButton(page, 'Kurang 1, kurang 2').locator('.tag.gold')).toHaveText('👑 0/3');
+});
+
+test('no Ulang kaji button before any level is passed', async ({ page }) => {
+  await open(page);
+  await expect(page.getByRole('button', { name: /Ulang kaji/ })).toHaveCount(0);
 });

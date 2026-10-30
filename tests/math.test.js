@@ -44,8 +44,16 @@ const count = (html, re) => (html.match(re) || []).length;
 test('the learning path is in the agreed order', () => {
   assert.deepEqual(math.levels.map((l) => l.id), [
     'math-count5', 'math-numerals', 'math-count10', 'math-compare', 'math-sequence',
-    'math-bond5', 'math-add5', 'math-sub5', 'math-bond10', 'math-add10',
+    'math-countback10', 'math-bond5', 'math-add5', 'math-less', 'math-sub5',
+    'math-bond10', 'math-add10', 'math-sub10', 'math-count20', 'math-countback20', 'math-sub20',
   ]);
+});
+
+test('placement probes the main levels only, always starting with the first', () => {
+  const probed = math.levels.filter((l) => l.probe !== false).map((l) => l.id);
+  assert.equal(probed[0], 'math-count5');
+  assert.ok(probed.length <= 9, `${probed.length} probed levels`);
+  assert.ok(probed.includes('math-sub20'));
 });
 
 test('numerals: the number shown matches the group it asks for', () => {
@@ -129,4 +137,55 @@ test('numerals: Mandarin says 两 for 2', () => {
     const q = level('math-numerals').gen();
     if (q.answer === 2) assert.match(q.prompt.zh, /两/);
   }
+});
+
+for (const [id, max] of [['math-countback10', 10], ['math-countback20', 20]]) {
+  test(`${id}: three numbers counting down, then the next one`, () => {
+    many(id, (q) => {
+      const nums = [...q.visual.matchAll(/<span>(\d+)<\/span>/g)].map((m) => Number(m[1]));
+      assert.equal(nums.length, 3);
+      assert.deepEqual(nums, [nums[0], nums[0] - 1, nums[0] - 2]);
+      assert.ok(nums[0] <= max);
+      assert.equal(q.answer, nums[2] - 1);
+      assert.ok(q.answer >= 1);
+    });
+  });
+}
+
+test('less: 1 or 2 less, never below 1, the number is marked on the line', () => {
+  many('math-less', (q) => {
+    const [n, k] = q.key.slice(1).split('-').map(Number);
+    assert.ok(k === 1 || k === 2);
+    assert.equal(q.answer, n - k);
+    assert.ok(q.answer >= 1);
+    assert.match(q.visual, new RegExp(`class="here">${n}<`));
+  });
+});
+
+test('count 11–20: one full ten frame plus the rest', () => {
+  many('math-count20', (q) => {
+    assert.ok(q.answer >= 11 && q.answer <= 20);
+    assert.equal(count(q.visual, /class="cell"/g), 20);
+    assert.equal(count(q.visual, /class="dot"/g), q.answer);
+  });
+});
+
+for (const [id, max] of [['math-sub10', 10], ['math-sub20', 20]]) {
+  test(`${id}: written as "a − b = ?", answer at least 1`, () => {
+    many(id, (q) => {
+      const [, a, b] = q.text.match(/^(\d+) − (\d+) = \?$/).map(Number);
+      assert.ok(a <= max);
+      assert.equal(q.answer, a - b);
+      assert.ok(q.answer >= 1);
+      if (max === 20) assert.ok(a >= 11, 'within-20 level uses teen numbers');
+    });
+  });
+}
+
+test('subtract within 20: dots for the first number, the taken-away ones crossed out', () => {
+  many('math-sub20', (q) => {
+    const [, a, b] = q.text.match(/^(\d+) − (\d+) = \?$/).map(Number);
+    assert.equal(count(q.visual, /class="dot( gone)?"/g), a);
+    assert.equal(count(q.visual, /class="dot gone"/g), b);
+  });
 });

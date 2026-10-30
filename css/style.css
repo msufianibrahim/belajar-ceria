@@ -53,6 +53,8 @@ button:disabled { cursor: default; }
 .bottom { display: flex; gap: 16px; margin-top: 24px; }
 .big-btn { flex: 1; background: #fff; border-radius: var(--radius); padding: 18px; font-size: 1.4rem; font-weight: 700; box-shadow: 0 6px 0 #0002; }
 .big-btn.primary { background: var(--good); color: #fff; }
+.big-btn.review { display: block; width: 100%; margin-top: 20px; background: #fff3c4; }
+.big-btn.review small { font-weight: 400; font-size: 1rem; }
 
 /* ---------- level path ---------- */
 .path { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
@@ -84,6 +86,7 @@ button:disabled { cursor: default; }
 .speak .zh { font-size: 1.8rem; font-weight: 700; }
 .speak .py { font-size: 1.1rem; color: #8a6d3b; }
 .speak .sub { font-size: .95rem; color: #0008; margin-top: 4px; }
+.tag.gold { background: #f5a623; }
 .tag { display: inline-block; vertical-align: middle; font-size: .8rem; font-weight: 700; color: #fff; background: #e53935; border-radius: 8px; padding: 2px 8px; }
 .speak { align-self: center; margin-top: 14px; background: #fff3c4; border-radius: 24px; padding: 10px 20px; font-size: 1.2rem; }
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
@@ -110,6 +113,17 @@ button:disabled { cursor: default; }
 .pair b { font-size: 2.6rem; }
 .mini { display: grid; grid-template-columns: repeat(5, 18px); gap: 5px; }
 .mini i { width: 18px; height: 18px; border-radius: 50%; display: block; }
+
+/* number line (less), two ten frames (11–20), crossed-out dots (subtraction) */
+.line { display: flex; justify-content: center; gap: 4px; }
+.line span { width: 48px; height: 56px; border-radius: 10px; background: #fff3c4; display: grid; place-items: center; font-size: 1.6rem; font-weight: 800; }
+.line .here { background: var(--accent); color: #fff; transform: scale(1.15); }
+.frames { display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
+.frames .frame { grid-template-columns: repeat(5, 44px); gap: 4px; padding: 4px; margin: 0; }
+.frames .cell { width: 44px; height: 44px; }
+.frames .dot { width: 32px; height: 32px; background: #ff7043; }
+.dot.gone { background: #ffd5c7; display: grid; place-items: center; }
+.dot.gone::after { content: '✕'; color: var(--bad); font-weight: 900; font-size: 1.4rem; }
 
 @keyframes pop { 50% { transform: scale(1.08); } }
 @keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }

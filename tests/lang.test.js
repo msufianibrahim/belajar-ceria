@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { questionLang, zhCount } from '../js/lang.js';
+import { questionLang, zhCount, py } from '../js/lang.js';
 import { fromJson } from '../js/storage.js';
 
 const mastered = { levels: { lv: { best: 5, cleared: true, perfectDays: ['a', 'b', 'c'], mastered: true } } };
@@ -30,4 +30,10 @@ test('English as the base language', () => {
 test('2 before a measure word is 两 (liǎng), not 二', () => {
   assert.deepEqual(zhCount(2), ['两', 'liǎng']);
   assert.deepEqual(zhCount(8), ['8', 'bā']);
+});
+
+test('pinyin numbers go up to 20', () => {
+  assert.equal(py(10), 'shí');
+  assert.equal(py(13), 'shísān');
+  assert.equal(py(20), 'èrshí');
 });

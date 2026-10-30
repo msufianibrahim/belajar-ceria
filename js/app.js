@@ -2,7 +2,7 @@ import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
 import { settleRound, MASTERY_DAYS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
-import { topIndex, openUpTo } from './progress.js';
+import { topIndex, openUpTo, pickReview } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
@@ -101,6 +101,7 @@ function homeScreen() {
     </header>
     <section class="hero">${avatar()}<h1>Assalamualaikum${name}!</h1></section>
     <section class="subjects">${tiles}</section>
+    ${pickReview(state, SUBJECTS, todayKey()) ? '<button class="big-btn review" data-act="review">🔁 Ulang kaji <small>— dapatkan 👑</small></button>' : ''}
     <nav class="bottom">
       <button class="big-btn" data-act="go" data-arg="stickers">📒 Pelekat <b>${state.stickers.length}</b></button>
       <button class="big-btn" data-act="go" data-arg="shop">🛍️ Kedai</button>
@@ -115,9 +116,10 @@ function subjectScreen() {
     const locked = i > top;
     const badge = locked ? '🔒' : r?.mastered ? '👑' : i + 1;
     const zh = !locked && questionLang(state, l.id) === 'zh' ? '<span class="tag">华文</span>' : '';
+    const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS}</span>` : '';
     return `<li><button class="level ${locked ? 'locked' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
-      <span class="lvl-title">${l.icon} ${l.title} ${zh}</span>
+      <span class="lvl-title">${l.icon} ${l.title} ${zh} ${toward}</span>
       <span class="stars">${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
@@ -290,8 +292,8 @@ function startRound(subjectId, levelIdx) {
   if (ok) sayQuestion();
 }
 
-// Placement feels like a normal game: no right/wrong feedback, it just climbs
-// levels while the child answers both questions correctly.
+// Placement feels like a normal game: no right/wrong feedback, it just climbs the
+// main (probed) levels while the child answers both questions correctly.
 function startPlacement(subjectId) {
   const first = subjectById(subjectId).levels[0];
   const ok = go('placement', { subjectId, levelIdx: 0, step: 0, correct: 0, q: first.gen(), busy: false });
@@ -309,8 +311,9 @@ function placementAnswer(right, el) {
     v.correct += right ? 1 : 0;
     v.step++;
     if (v.step >= PLACEMENT_PER_LEVEL) {
-      if (v.correct === PLACEMENT_PER_LEVEL && v.levelIdx < s.levels.length - 1) {
-        v.levelIdx++;
+      const next = s.levels.findIndex((l, j) => j > v.levelIdx && l.probe !== false);
+      if (v.correct === PLACEMENT_PER_LEVEL && next !== -1) {
+        v.levelIdx = next;
         v.step = 0;
         v.correct = 0;
       } else {
@@ -435,6 +438,10 @@ const ACTIONS = {
   },
   subject: (id) => (state.placed[id] ? go('subject', { subjectId: id }) : startPlacement(id)),
   play: (i) => startRound(view.subjectId, Number(i)),
+  review: () => {
+    const r = pickReview(state, SUBJECTS, todayKey());
+    if (r) startRound(r.subjectId, r.levelIdx);
+  },
   answer: (k, el) => answer(Number(k), el),
   say: () => sayQuestion(),
   shopItem: (id) => shopTap(id),

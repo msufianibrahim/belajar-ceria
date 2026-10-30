@@ -1,7 +1,7 @@
 import { SUBJECTS } from './subjects/index.js';
 
 // Avatar shop. Prices are tuned so one subject can't buy everything:
-// Math alone pays roughly 300 coins in total; the shop costs 380.
+// Math alone pays roughly 480 coins in total; the shop costs 580.
 export const SHOP = [
   { id: 'c-yellow', cat: 'color', label: 'Kuning', value: '#ffd54d', price: 0 },
   { id: 'c-blue', cat: 'color', label: 'Biru', value: '#7cc6fe', price: 15 },
@@ -9,16 +9,21 @@ export const SHOP = [
   { id: 'c-pink', cat: 'color', label: 'Merah jambu', value: '#ffadd2', price: 15 },
   { id: 'c-purple', cat: 'color', label: 'Ungu', value: '#c7a6ff', price: 20 },
   { id: 'c-orange', cat: 'color', label: 'Oren', value: '#ffb38a', price: 20 },
+  { id: 'c-teal', cat: 'color', label: 'Hijau laut', value: '#80deea', price: 25 },
   { id: 'h-cap', cat: 'hat', label: 'Topi', value: '🧢', price: 15 },
   { id: 'h-bow', cat: 'hat', label: 'Reben', value: '🎀', price: 20 },
   { id: 'h-grad', cat: 'hat', label: 'Topi graduasi', value: '🎓', price: 30 },
   { id: 'h-crown', cat: 'hat', label: 'Mahkota', value: '👑', price: 40 },
+  { id: 'h-top', cat: 'hat', label: 'Topi tinggi', value: '🎩', price: 35 },
   { id: 'p-turtle', cat: 'pet', label: 'Penyu', value: '🐢', price: 25 },
   { id: 'p-cat', cat: 'pet', label: 'Kucing', value: '🐱', price: 30 },
   { id: 'p-rabbit', cat: 'pet', label: 'Arnab', value: '🐰', price: 30 },
   { id: 'p-bird', cat: 'pet', label: 'Burung', value: '🦜', price: 35 },
   { id: 'p-fish', cat: 'pet', label: 'Ikan', value: '🐠', price: 30 },
   { id: 'p-duck', cat: 'pet', label: 'Itik', value: '🦆', price: 40 },
+  { id: 'p-penguin', cat: 'pet', label: 'Penguin', value: '🐧', price: 40 },
+  { id: 'p-dino', cat: 'pet', label: 'Dinosaur', value: '🦕', price: 50 },
+  { id: 'p-unicorn', cat: 'pet', label: 'Unikorn', value: '🦄', price: 50 },
 ];
 
 // Stickers a parent awards from the parent screen for off-screen activities.

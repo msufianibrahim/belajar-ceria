@@ -9,7 +9,7 @@
 
 export const COINS = { firstClear: 10, newBest: 5, mastery: 15 };
 export const MASTERY_DAYS = 3;
-export const passMark = (total) => Math.ceil(total * 0.6);
+export const passMark = (total) => Math.ceil(total * 0.8); // 4 of 5
 
 export function settleRound(state, level, score, total, today) {
   const rec = (state.levels[level.id] ??= { best: 0, cleared: false, perfectDays: [], mastered: false });
@@ -36,6 +36,7 @@ export function settleRound(state, level, score, total, today) {
     res.newBest = true;
   }
   rec.best = Math.max(rec.best, score);
+  rec.lastPlayed = today;
 
   if (score === total && !rec.mastered) {
     if (!rec.perfectDays.includes(today)) rec.perfectDays.push(today);
