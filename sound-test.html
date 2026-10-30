@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ujian Suara Arab</title>
+  <style>
+    body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; background: #fff8e7; color: #3b2f2f; }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; }
+    h2 { font-size: 1.15rem; margin: 24px 0 4px; }
+    p { margin: 4px 0; }
+    .muted { color: #0009; font-size: .9rem; }
+    .bar { position: sticky; top: 0; background: #fff8e7; padding: 8px 0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; z-index: 1; }
+    select, input, button, textarea { font: inherit; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+    .item { background: #fff; border-radius: 16px; padding: 8px; text-align: center; box-shadow: 0 3px 0 #0001; }
+    .item.ok { outline: 3px solid #5cc46b; }
+    .item.bad { outline: 3px solid #ff7b7b; }
+    .play { width: 100%; border: 0; background: #fff3c4; border-radius: 12px; padding: 6px 0; cursor: pointer; }
+    .ar { font-family: "Geeza Pro", "Noto Naskh Arabic", "Amiri", serif; font-size: 2.6rem; line-height: 1.6; direction: rtl; display: block; }
+    .hint { font-size: .8rem; color: #0008; }
+    .marks { display: flex; gap: 6px; margin-top: 6px; }
+    .marks button { flex: 1; border: 0; border-radius: 10px; padding: 6px 0; background: #f0e6d2; font-size: 1.1rem; cursor: pointer; }
+    textarea { width: 100%; height: 160px; margin-top: 8px; }
+    .warn { background: #ffe0e0; padding: 10px; border-radius: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Ujian Suara Arab (untuk Iqra)</h1>
+  <p class="muted">Tekan setiap bunyi, dengar, kemudian tandakan ✓ (betul) atau ✗ (salah). Kalau salah, cuba tulis apa yang didengar dalam kotak di bawah.</p>
+
+  <div class="bar">
+    <label>Suara: <select id="voice"></select></label>
+    <label>Laju: <input id="rate" type="range" min="0.4" max="1.1" step="0.1" value="0.7"> <span id="rateVal">0.7</span></label>
+  </div>
+  <p id="noVoice" class="warn" hidden>Tiada suara Arab dalam tablet ini. Pasang suara Arab dalam Tetapan → Text-to-speech (Android) atau Tetapan → Kebolehcapaian → Kandungan Dituturkan → Suara (iPad), kemudian buka semula halaman ini.</p>
+
+  <div id="sections"></div>
+
+  <h2>Keputusan</h2>
+  <p class="muted">Salin teks ini dan hantar kepada Claude.</p>
+  <textarea id="out" readonly></textarea>
+
+  <script>
+    // What we want to know: does the tablet's Arabic voice say the *sound* (e.g. "ba")
+    // rather than the letter's name ("baa"), and get harakat, mad, tanwin, sukun, tasydid right?
+    const LETTERS = 'ا ب ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن و ه ي'.split(' ');
+    const F = 'َ', K = 'ِ', D = 'ُ', SUK = 'ْ', SHD = 'ّ';
+    const TAN_F = 'ً', TAN_K = 'ٍ', TAN_D = 'ٌ';
+    const withH = (h) => LETTERS.map((l) => (l === 'ا' ? 'أ' : l) + h);
+
+    const SECTIONS = [
+      { id: 'fathah', title: 'Iqra 1: huruf berbaris atas (fathah)', hint: 'Sepatutnya: a, ba, ta, tsa…', items: withH(F) },
+      { id: 'joined', title: 'Iqra 2: huruf bersambung', hint: 'Contoh: ba-ta, ka-ta-ba', items: ['بَتَ', 'كَتَبَ', 'أَخَذَ', 'جَلَسَ', 'ذَهَبَ', 'فَتَحَ'] },
+      { id: 'mad', title: 'Iqra 2: bacaan panjang (mad)', hint: 'Sepatutnya: baa, tii, tsuu (2 harakat)', items: ['بَا', 'تَا', 'قَالَ', 'تِي', 'فِي', 'نُو', 'ثُو'] },
+      { id: 'kasrah', title: 'Iqra 3: baris bawah (kasrah)', hint: 'Sepatutnya: bi, ti, si…', items: withH(K).slice(0, 10) },
+      { id: 'dhammah', title: 'Iqra 3: baris hadapan (dhammah)', hint: 'Sepatutnya: bu, tu, su…', items: withH(D).slice(0, 10) },
+      { id: 'tanwin', title: 'Iqra 4: tanwin', hint: 'Sepatutnya: ban, bin, bun', items: ['بً', 'بٍ', 'بٌ', 'كِتَابٌ', 'رَجُلًا'] },
+      { id: 'sukun', title: 'Iqra 4: sukun & qalqalah', hint: 'Contoh: ab, an-ta, aq-ra-a', items: ['أَبْ', 'أَنْتَ', 'يَقْطَعُ', 'أَحَدْ', 'اِقْرَأْ'] },
+      { id: 'shaddah', title: 'Iqra 5: tasydid', hint: 'Contoh: rab-ba, in-na', items: ['رَبَّ', 'إِنَّ', 'ثُمَّ', 'الشَّمْسُ', 'الْقَمَرُ'] },
+    ];
+
+    const KEY = 'sound-test-marks';
+    const marks = JSON.parse(localStorage.getItem(KEY) || '{}');
+    let voices = [];
+
+    function arabicVoices() {
+      return speechSynthesis.getVoices().filter((v) => v.lang.toLowerCase().startsWith('ar'));
+    }
+
+    function fillVoices() {
+      voices = arabicVoices();
+      const sel = document.getElementById('voice');
+      const keep = sel.value;
+      sel.innerHTML = voices.map((v, i) => `<option value="${i}">${v.name} (${v.lang})</option>`).join('');
+      if (keep && voices[keep]) sel.value = keep;
+      document.getElementById('noVoice').hidden = voices.length > 0;
+      renderOut();
+    }
+
+    function speak(text) {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = voices[document.getElementById('voice').value];
+      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'ar-SA'; }
+      u.rate = Number(document.getElementById('rate').value);
+      speechSynthesis.speak(u);
+    }
+
+    function render() {
+      document.getElementById('sections').innerHTML = SECTIONS.map((s) => `
+        <h2>${s.title}</h2><p class="muted">${s.hint}</p>
+        <div class="grid">${s.items.map((t, i) => {
+          const id = `${s.id}-${i}`;
+          const m = marks[id];
+          return `<div class="item ${m === 'ok' ? 'ok' : m === 'bad' ? 'bad' : ''}">
+            <button class="play" data-say="${t}"><span class="ar">${t}</span>🔊</button>
+            <div class="marks"><button data-mark="${id}" data-v="ok">✓</button><button data-mark="${id}" data-v="bad">✗</button></div>
+          </div>`;
+        }).join('')}</div>`).join('');
+      renderOut();
+    }
+
+    function renderOut() {
+      const v = voices[document.getElementById('voice').value];
+      const lines = [`Suara: ${v ? `${v.name} (${v.lang})` : 'tiada suara Arab'}`, `Laju: ${document.getElementById('rate').value}`];
+      for (const s of SECTIONS) {
+        const bad = s.items.filter((_, i) => marks[`${s.id}-${i}`] === 'bad');
+        const done = s.items.filter((_, i) => marks[`${s.id}-${i}`]).length;
+        lines.push(`${s.id}: ${done}/${s.items.length} diuji, salah: ${bad.length ? bad.join(' ') : '-'}`);
+      }
+      document.getElementById('out').value = lines.join('\n');
+    }
+
+    document.addEventListener('click', (e) => {
+      const play = e.target.closest('[data-say]');
+      if (play) return speak(play.dataset.say);
+      const mark = e.target.closest('[data-mark]');
+      if (mark) {
+        marks[mark.dataset.mark] = mark.dataset.v;
+        localStorage.setItem(KEY, JSON.stringify(marks));
+        render();
+      }
+    });
+    document.getElementById('rate').addEventListener('input', (e) => {
+      document.getElementById('rateVal').textContent = e.target.value;
+      renderOut();
+    });
+    document.getElementById('voice').addEventListener('change', renderOut);
+
+    render();
+    fillVoices();
+    speechSynthesis.addEventListener?.('voiceschanged', fillVoices);
+  </script>
+</body>
+</html>
