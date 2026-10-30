@@ -44,6 +44,19 @@ open http://localhost:8000
 npm test
 ```
 
+## Testing
+
+| Command | What it checks |
+|---|---|
+| `npm test` | Unit tests (`tests/`): reward rules, session limit, question generators. Takes under 1 s. |
+| `npm run test:e2e` | Playwright (`e2e/`): real user flows on an Android-tablet Chromium and an iPad WebKit. Takes about 35 s. |
+| `npm run test:all` | Both. GitHub Actions also runs both on every push. |
+
+* **Write tests first for the logic** (rewards, session limit, new question generators). Write the failing test, then the code.
+* **Use Playwright for flows.** Add a test when you add a screen or change how the child moves through the app.
+* **Don't test the look.** Check it by eye and by watching your child play.
+* The e2e tests open `/?test`, which exposes `window.__test.correctIndex()` so a test can always pick the right answer. That hook is off in normal use.
+
 ## Put it on the tablet (free)
 
 1. Push this repo to GitHub.

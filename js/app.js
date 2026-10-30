@@ -1,6 +1,7 @@
 import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
 import { settleRound, MASTERY_DAYS } from './rewards.js';
+import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
@@ -22,31 +23,18 @@ const say = (text) => state.settings.voice && speak(text);
 const clock = (ms) => new Date(ms).toLocaleTimeString('ms-MY', { hour: 'numeric', minute: '2-digit' });
 
 // ---------------------------------------------------------------- session limit
-// Counts active play time only (screen visible). A natural break as long as the
-// rest period also resets the clock. When time is up, the child finishes the
-// current round, then the avatar goes to sleep.
 
 function mustRest() {
-  const s = state.session;
-  const now = Date.now();
-  const restMs = state.settings.restMinutes * 60000;
-  if (s.restUntil > now) return true;
-  if (s.restUntil) { s.restUntil = 0; s.usedMs = 0; }
-  if (s.lastActive && now - s.lastActive > restMs) s.usedMs = 0;
-  if (s.usedMs >= state.settings.sessionMinutes * 60000) {
-    s.restUntil = now + restMs;
-    s.usedMs = 0;
-    persist();
-    return true;
-  }
-  return false;
+  const before = state.session.restUntil;
+  const rest = mustRestFor(state.session, state.settings, Date.now());
+  if (state.session.restUntil !== before) persist();
+  return rest;
 }
 
 setInterval(() => {
   if (view.name === 'sleepy' && state.session.restUntil <= Date.now()) return go('home');
   if (document.hidden || !KID_SCREENS.has(view.name)) return;
-  state.session.usedMs += 5000;
-  state.session.lastActive = Date.now();
+  addPlayTime(state.session, 5000, Date.now());
   persist();
 }, 5000);
 
@@ -444,8 +432,7 @@ const ACTIONS = {
     render();
   },
   endRest: () => {
-    state.session.restUntil = 0;
-    state.session.usedMs = 0;
+    endRest(state.session);
     persist();
     render();
   },
@@ -489,6 +476,13 @@ app.addEventListener('change', (e) => {
 
 requestPersist();
 go('home');
+
+// Hook for the Playwright tests (only with ?test in the URL): exposes the correct answer.
+if (new URLSearchParams(location.search).has('test')) {
+  window.__test = {
+    correctIndex: () => currentQ().choices.findIndex((c) => c.value === currentQ().answer),
+  };
+}
 
 // Offline support. Skipped on localhost so edits show up immediately while developing.
 const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
