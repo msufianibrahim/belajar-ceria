@@ -2,7 +2,7 @@ import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
 import { settleRound, MASTERY_DAYS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
-import { topIndex, openUpTo, pickReview } from './progress.js';
+import { topIndex, openUpTo, pickReview, answerMode } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
@@ -138,10 +138,18 @@ function questionScreen() {
       ${q.text ? `<div class="qtext">${q.text}</div>` : ''}
       <button class="speak" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
     </div>
-    <div class="choices ${q.wide ? 'wide' : ''}">
+    ${view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''}">
       ${q.choices.map((c, k) => `<button class="choice" data-act="answer" data-arg="${k}">${c.label}</button>`).join('')}
-    </div>`;
+    </div>`}`;
 }
+
+const keypad = () => `<div class="typed">${view.typed || '?'}</div>
+  <div class="keypad">
+    ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button class="key" data-act="key" data-arg="${d}">${d}</button>`).join('')}
+    <button class="key del" data-act="del" aria-label="Padam">⌫</button>
+    <button class="key" data-act="key" data-arg="0">0</button>
+    <button class="key ok" data-act="enter" aria-label="Hantar">✓</button>
+  </div>`;
 
 function resultTitle(res) {
   if (res.score === res.total) return 'Hebat! Semua betul!';
@@ -155,6 +163,7 @@ function resultsScreen() {
   if (res.coins) lines.push(`🪙 +${res.coins} syiling`);
   if (res.sticker) lines.push(`${res.sticker.e} Pelekat baru!`);
   if (res.newBest) lines.push('⬆️ Markah terbaik baru!');
+  if (res.needsTyping) lines.push('⌨️ Lain kali taip jawapan untuk dapat 👑');
   if (res.justMastered) lines.push('👑 Kamu sudah mahir!');
   else if (res.masteryProgress) lines.push(`👑 Mahir: ${res.masteryProgress}/${MASTERY_DAYS} hari — main lagi hari lain!`);
   if (retries && res.passed) lines.push('🌱 Kamu terus mencuba — itu hebat!');
@@ -288,7 +297,10 @@ function promptHtml(p, lang) {
 
 function startRound(subjectId, levelIdx) {
   const level = subjectById(subjectId).levels[levelIdx];
-  const ok = go('play', { subjectId, levelIdx, qs: makeRound(level.gen, ROUND), i: 0, score: 0, retries: 0, missed: false, busy: false });
+  const ok = go('play', {
+    subjectId, levelIdx, qs: makeRound(level.gen, ROUND), i: 0, score: 0, retries: 0, missed: false, busy: false,
+    mode: answerMode(state, level), typed: '',
+  });
   if (ok) sayQuestion();
 }
 
@@ -331,22 +343,14 @@ function placementAnswer(right, el) {
   }, 600);
 }
 
-function answer(k, el) {
-  if (view.busy) return;
-  const q = currentQ();
-  const right = q.choices[k].value === q.answer;
-  if (view.name === 'placement') return placementAnswer(right, el);
+function markWrong() {
+  view.missed = true;
+  view.retries++;
+  chime('wrong');
+  say(RETRY[currentLang()], currentLang());
+}
 
-  if (!right) {
-    view.missed = true;
-    view.retries++;
-    el.classList.add('wrong');
-    el.disabled = true;
-    chime('wrong');
-    say(RETRY[currentLang()], currentLang());
-    return;
-  }
-
+function markRight(el) {
   const v = view;
   v.busy = true;
   el.classList.add('right');
@@ -358,14 +362,53 @@ function answer(k, el) {
     v.i++;
     v.missed = false;
     v.busy = false;
+    v.typed = '';
     if (v.i < v.qs.length) { render(); sayQuestion(); } else finishRound();
   }, 1000);
+}
+
+function answer(k, el) {
+  if (view.busy) return;
+  const q = currentQ();
+  const right = q.choices[k].value === q.answer;
+  if (view.name === 'placement') return placementAnswer(right, el);
+  if (!right) {
+    el.classList.add('wrong');
+    el.disabled = true;
+    return markWrong();
+  }
+  markRight(el);
+}
+
+// Number pad: up to 2 digits, then ✓.
+function typeKey(d) {
+  if (view.busy || view.typed.length >= 2) return;
+  view.typed += d;
+  app.querySelector('.typed').textContent = view.typed;
+}
+
+function typeDelete() {
+  if (view.busy) return;
+  view.typed = view.typed.slice(0, -1);
+  app.querySelector('.typed').textContent = view.typed || '?';
+}
+
+function typeEnter() {
+  if (view.busy || !view.typed) return;
+  const box = app.querySelector('.typed');
+  if (Number(view.typed) === currentQ().answer) return markRight(box);
+  view.typed = '';
+  box.textContent = '?';
+  box.classList.remove('wrong');
+  void box.offsetWidth; // restart the shake animation
+  box.classList.add('wrong');
+  markWrong();
 }
 
 function finishRound() {
   const s = subjectById(view.subjectId);
   const level = s.levels[view.levelIdx];
-  const res = settleRound(state, level, view.score, view.qs.length, todayKey());
+  const res = settleRound(state, level, view.score, view.qs.length, todayKey(), { typed: view.mode === 'type' });
   if (res.passed) openUpTo(state, s, view.levelIdx + 1);
   persist();
   go('results', { subjectId: s.id, levelIdx: view.levelIdx, res, retries: view.retries });
@@ -443,6 +486,9 @@ const ACTIONS = {
     if (r) startRound(r.subjectId, r.levelIdx);
   },
   answer: (k, el) => answer(Number(k), el),
+  key: (d) => typeKey(d),
+  del: () => typeDelete(),
+  enter: () => typeEnter(),
   say: () => sayQuestion(),
   shopItem: (id) => shopTap(id),
   buyYes: () => buy(),
@@ -503,6 +549,7 @@ go('home');
 if (new URLSearchParams(location.search).has('test')) {
   window.__test = {
     correctIndex: () => currentQ().choices.findIndex((c) => c.value === currentQ().answer),
+    answer: () => currentQ().answer,
   };
 }
 

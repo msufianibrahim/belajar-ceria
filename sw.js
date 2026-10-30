@@ -1,6 +1,6 @@
 // Offline cache. Cache-first, so BUMP THIS VERSION every time you deploy changes,
 // otherwise the tablet keeps showing the old app.
-const CACHE = 'belajar-ceria-v6';
+const CACHE = 'belajar-ceria-v7';
 
 const FILES = [
   './',

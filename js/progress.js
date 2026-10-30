@@ -44,3 +44,7 @@ export function pickReview(state, subjects, today) {
   }
   return best && { subjectId: best.subjectId, levelIdx: best.levelIdx };
 }
+
+// Choices to learn, number pad to master: once an add/subtract level is passed,
+// the child types the answer instead of picking it.
+export const answerMode = (state, level) => (level.typed && state.levels[level.id]?.cleared ? 'type' : 'choose');

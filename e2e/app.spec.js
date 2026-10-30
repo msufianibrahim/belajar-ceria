@@ -14,7 +14,17 @@ async function open(page, seed) {
 const choices = (page) => page.locator('.choice');
 const correctIndex = (page) => page.evaluate(() => window.__test.correctIndex());
 
+async function typeAnswer(page, value) {
+  for (const d of String(value)) await page.locator(`.key[data-arg="${d}"]`).click();
+  await page.getByRole('button', { name: 'Hantar' }).click();
+}
+
 async function answerRight(page) {
+  if (await page.locator('.keypad').count()) {
+    await typeAnswer(page, await page.evaluate(() => window.__test.answer()));
+    await expect(page.locator('.typed.right')).toHaveCount(0);
+    return;
+  }
   await choices(page).nth(await correctIndex(page)).click();
   // Wait for the feedback animation to finish and the next screen to render.
   await expect(page.locator('.choice.right, .choice.picked')).toHaveCount(0);
@@ -256,4 +266,44 @@ test('mastery progress shows on passed levels; Ulang kaji replays the oldest one
 test('no Ulang kaji button before any level is passed', async ({ page }) => {
   await open(page);
   await expect(page.getByRole('button', { name: /Ulang kaji/ })).toHaveCount(0);
+});
+
+const passedAdd5 = {
+  placed: { math: true },
+  frontier: { math: 'math-less' },
+  levels: { 'math-add5': { best: 4, cleared: true, perfectDays: [], mastered: false } },
+};
+
+test('before passing an add/subtract level: choices; a perfect round says to type next time', async ({ page }) => {
+  await open(page, { placed: { math: true }, frontier: { math: 'math-add5' } });
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Tambah hingga 5').click();
+  await expect(page.locator('.keypad')).toHaveCount(0);
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await expect(page.locator('.results')).toContainText('taip jawapan');
+  await expect(page.locator('.results')).not.toContainText('Mahir:');
+});
+
+test('after passing: number pad, and a perfect typed round counts toward mastery', async ({ page }) => {
+  await open(page, passedAdd5);
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Tambah hingga 5').click();
+  await expect(page.locator('.keypad')).toBeVisible();
+  await expect(choices(page)).toHaveCount(0);
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await expect(page.locator('.results')).toContainText('Mahir: 1/3');
+});
+
+test('number pad: a wrong answer clears the box and he can try again', async ({ page }) => {
+  await open(page, passedAdd5);
+  await page.getByRole('button', { name: /Matematik/ }).click();
+  await levelButton(page, 'Tambah hingga 5').click();
+  const right = await page.evaluate(() => window.__test.answer());
+  await typeAnswer(page, right === 1 ? 2 : 1);
+  await expect(page.locator('.typed')).toHaveText('?');
+  await page.locator('.key[data-arg="3"]').click();
+  await page.getByRole('button', { name: 'Padam' }).click();
+  await expect(page.locator('.typed')).toHaveText('?');
+  await typeAnswer(page, right);
+  await expect(page.locator('.dots .done')).toHaveCount(1);
 });

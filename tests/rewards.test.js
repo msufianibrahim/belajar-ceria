@@ -60,3 +60,19 @@ test('each round records the day it was played', () => {
   settleRound(s, level, 2, 5, 'd2');
   assert.equal(s.levels.lv.lastPlayed, 'd2');
 });
+
+const typedLevel = { id: 'tl', typed: true, sticker: { id: 'st2', e: '⭐' } };
+
+test('typed levels: a perfect round with choices does not count toward mastery', () => {
+  const s = fresh();
+  const r = settleRound(s, typedLevel, 5, 5, 'd1', { typed: false });
+  assert.deepEqual(s.levels.tl.perfectDays, []);
+  assert.equal(r.needsTyping, true);
+});
+
+test('typed levels: a perfect typed round counts toward mastery', () => {
+  const s = fresh();
+  const r = settleRound(s, typedLevel, 5, 5, 'd1', { typed: true });
+  assert.deepEqual(s.levels.tl.perfectDays, ['d1']);
+  assert.equal(r.needsTyping, false);
+});

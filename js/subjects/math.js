@@ -262,6 +262,7 @@ export default {
   name: 'Matematik',
   icon: '🔢',
   color: '#ffb74d',
+  // typed: answered on a number pad once passed (see progress.js answerMode).
   // probe: false = stepping stone; placement skips it (it opens with the levels around it).
   levels: [
     { id: 'math-count5', title: 'Kira 1–5', icon: '🍎', sticker: { id: 'st-lion', e: '🦁' }, gen: () => count(1, 5) },
@@ -271,14 +272,14 @@ export default {
     { id: 'math-sequence', title: 'Sebelum & selepas', icon: '➡️', probe: false, sticker: { id: 'st-owl', e: '🦉' }, gen: () => sequence(10) },
     { id: 'math-countback10', title: 'Kira undur hingga 10', icon: '⬅️', probe: false, sticker: { id: 'st-koala', e: '🐨' }, gen: () => countBack(4, 10) },
     { id: 'math-bond5', title: 'Pasangan 5', icon: '🖐️', probe: false, sticker: { id: 'st-octopus', e: '🐙' }, gen: () => bond(5) },
-    { id: 'math-add5', title: 'Tambah hingga 5', icon: '➕', sticker: { id: 'st-dolphin', e: '🐬' }, gen: () => add(5) },
+    { id: 'math-add5', typed: true, title: 'Tambah hingga 5', icon: '➕', sticker: { id: 'st-dolphin', e: '🐬' }, gen: () => add(5) },
     { id: 'math-less', title: 'Kurang 1, kurang 2', icon: '🔙', probe: false, sticker: { id: 'st-fox', e: '🦊' }, gen: () => less(10) },
-    { id: 'math-sub5', title: 'Tolak hingga 5', icon: '➖', sticker: { id: 'st-zebra', e: '🦓' }, gen: () => subtract(5) },
+    { id: 'math-sub5', typed: true, title: 'Tolak hingga 5', icon: '➖', sticker: { id: 'st-zebra', e: '🦓' }, gen: () => subtract(5) },
     { id: 'math-bond10', title: 'Pasangan 10', icon: '🔟', probe: false, sticker: { id: 'st-peacock', e: '🦚' }, gen: () => bond(10) },
-    { id: 'math-add10', title: 'Tambah hingga 10', icon: '➕', sticker: { id: 'st-butterfly', e: '🦋' }, gen: () => add(10) },
-    { id: 'math-sub10', title: 'Tolak hingga 10', icon: '➖', sticker: { id: 'st-whale', e: '🐳' }, gen: () => subtract(10) },
+    { id: 'math-add10', typed: true, title: 'Tambah hingga 10', icon: '➕', sticker: { id: 'st-butterfly', e: '🦋' }, gen: () => add(10) },
+    { id: 'math-sub10', typed: true, title: 'Tolak hingga 10', icon: '➖', sticker: { id: 'st-whale', e: '🐳' }, gen: () => subtract(10) },
     { id: 'math-count20', title: 'Kira 11–20', icon: '🧮', sticker: { id: 'st-flamingo', e: '🦩' }, gen: () => countTeen() },
     { id: 'math-countback20', title: 'Kira undur hingga 20', icon: '⬅️', probe: false, sticker: { id: 'st-kangaroo', e: '🦘' }, gen: () => countBack(12, 20) },
-    { id: 'math-sub20', title: 'Tolak hingga 20', icon: '➖', sticker: { id: 'st-hedgehog', e: '🦔' }, gen: () => subtractTeen() },
+    { id: 'math-sub20', typed: true, title: 'Tolak hingga 20', icon: '➖', sticker: { id: 'st-hedgehog', e: '🦔' }, gen: () => subtractTeen() },
   ],
 };

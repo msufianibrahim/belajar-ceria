@@ -80,3 +80,18 @@ test('review: skips mastered levels and levels already perfect today', () => {
 test('review: skips levels not passed yet', () => {
   assert.equal(review({ 'math-count5': rec({ cleared: false, lastPlayed: 'd1' }) }), null);
 });
+
+import { answerMode } from '../js/progress.js';
+
+test('answer mode: choices to learn, number pad once an add/subtract level is passed', () => {
+  const add5 = math.levels[idx('math-add5')];
+  const count5 = math.levels[idx('math-count5')];
+  assert.equal(answerMode(fromJson({}), add5), 'choose');
+  assert.equal(answerMode(fromJson({ levels: { 'math-add5': rec() } }), add5), 'type');
+  assert.equal(answerMode(fromJson({ levels: { 'math-count5': rec() } }), count5), 'choose');
+});
+
+test('number pad is used on the addition and subtraction levels only', () => {
+  assert.deepEqual(math.levels.filter((l) => l.typed).map((l) => l.id),
+    ['math-add5', 'math-sub5', 'math-add10', 'math-sub10', 'math-sub20']);
+});
