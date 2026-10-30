@@ -33,7 +33,7 @@
     <label>Suara: <select id="voice"></select></label>
     <label>Laju: <input id="rate" type="range" min="0.4" max="1.1" step="0.1" value="0.7"> <span id="rateVal">0.7</span></label>
   </div>
-  <p id="noVoice" class="warn" hidden>Tiada suara Arab dalam tablet ini. Pasang suara Arab dalam Tetapan → Text-to-speech (Android) atau Tetapan → Kebolehcapaian → Kandungan Dituturkan → Suara (iPad), kemudian buka semula halaman ini.</p>
+  <p id="noVoice" class="muted" hidden>Pelayar tidak menyenaraikan suara Arab, jadi suara Arab lalai tablet akan digunakan. Kalau tiada bunyi langsung, pasang suara Arab dalam tetapan Text-to-speech tablet.</p>
 
   <div id="sections"></div>
 
@@ -80,7 +80,11 @@
       voices = arabicVoices();
       const sel = document.getElementById('voice');
       const keep = sel.value;
-      sel.innerHTML = voices.map((v, i) => `<option value="${i}">${v.name} (${v.lang})</option>`).join('');
+      // Some tablets (e.g. Chrome on Android) don't list installed voices but still speak
+      // Arabic with the default engine when asked for lang ar-SA.
+      sel.innerHTML = voices.length
+        ? voices.map((v, i) => `<option value="${i}">${v.name} (${v.lang})</option>`).join('')
+        : '<option value="">Suara Arab lalai tablet</option>';
       if (keep && voices[keep]) sel.value = keep;
       document.getElementById('noVoice').hidden = voices.length > 0;
       renderOut();
@@ -111,7 +115,7 @@
 
     function renderOut() {
       const v = voices[document.getElementById('voice').value];
-      const lines = [`Suara: ${v ? `${v.name} (${v.lang})` : 'tiada suara Arab'}`, `Laju: ${document.getElementById('rate').value}`];
+      const lines = [`Suara: ${v ? `${v.name} (${v.lang})` : 'lalai tablet (ar-SA)'}`, `Pelayar: ${navigator.userAgent}`, `Laju: ${document.getElementById('rate').value}`];
       for (const s of SECTIONS) {
         const bad = s.items.filter((_, i) => marks[`${s.id}-${i}`] === 'bad');
         const done = s.items.filter((_, i) => marks[`${s.id}-${i}`]).length;
@@ -122,7 +126,7 @@
 
     document.addEventListener('click', (e) => {
       const play = e.target.closest('[data-say]');
-      if (play) return speak(play.dataset.say);
+      if (play) { if (!voices.length) fillVoices(); return speak(play.dataset.say); }
       const mark = e.target.closest('[data-mark]');
       if (mark) {
         marks[mark.dataset.mark] = mark.dataset.v;
