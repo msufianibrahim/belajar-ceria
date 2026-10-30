@@ -1,0 +1,46 @@
+// All progress lives in localStorage on the tablet. No server, no account.
+const KEY = 'belajar-ceria-v1';
+
+const defaults = () => ({
+  childName: '',
+  coins: 0,
+  stickers: [],                 // sticker ids collected
+  owned: ['c-yellow'],          // shop item ids
+  equipped: { color: 'c-yellow', hat: null, pet: null },
+  levels: {},                   // levelId -> { best, cleared, perfectDays[], mastered }
+  unlocked: {},                 // subjectId -> highest unlocked level index
+  placed: {},                   // subjectId -> true once placement is done
+  settings: { sessionMinutes: 20, restMinutes: 60, voice: true },
+  session: { usedMs: 0, lastActive: 0, restUntil: 0 },
+});
+
+// Deep-merge saved data over defaults so new fields added later get sane values.
+function merge(base, saved) {
+  for (const [k, v] of Object.entries(saved ?? {})) {
+    const isObj = (x) => x && typeof x === 'object' && !Array.isArray(x);
+    base[k] = isObj(base[k]) && isObj(v) ? merge(base[k], v) : v;
+  }
+  return base;
+}
+
+export const fromJson = (data) => merge(defaults(), data);
+
+export function load() {
+  try {
+    return fromJson(JSON.parse(localStorage.getItem(KEY) || '{}'));
+  } catch {
+    return defaults();
+  }
+}
+
+export function save(state) {
+  localStorage.setItem(KEY, JSON.stringify(state));
+}
+
+// Ask the browser not to evict our data when storage is low.
+export function requestPersist() {
+  navigator.storage?.persist?.().catch(() => {});
+}
+
+// Local date as YYYY-MM-DD.
+export const todayKey = () => new Date().toLocaleDateString('en-CA');

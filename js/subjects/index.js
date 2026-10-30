@@ -1,0 +1,14 @@
+import math from './math.js';
+
+// A subject with no levels shows on the home screen as "Akan datang" (coming soon).
+// To add one: create js/subjects/<id>.js shaped like math.js, import it here,
+// and add the file to the FILES list in sw.js.
+export const SUBJECTS = [
+  math,
+  { id: 'bm', name: 'Bahasa Melayu', icon: '📖', color: '#7cc6fe', levels: [] },
+  { id: 'en', name: 'English', icon: '🔤', color: '#a5d6a7', levels: [] },
+  { id: 'zh', name: '华文', icon: '🏮', color: '#ff9e9e', levels: [] },
+  { id: 'iqra', name: 'Iqra', icon: '📗', color: '#9be0c9', levels: [] },
+  { id: 'jawi', name: 'Jawi', icon: '✍️', color: '#d1b3ff', levels: [] },
+  { id: 'islam', name: 'Asas Islam', icon: '🕌', color: '#ffe082', levels: [] },
+];
