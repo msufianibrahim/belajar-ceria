@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arabic voice re-check</title>
+  <style>
+    body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; background: #fff8e7; color: #3b2f2f; }
+    h1 { font-size: 1.4rem; margin: 0 0 6px; }
+    h2 { font-size: 1.1rem; margin: 22px 0 2px; }
+    .muted { color: #0009; font-size: .9rem; margin: 2px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 6px; }
+    .item { background: #fff; border-radius: 16px; padding: 8px; text-align: center; box-shadow: 0 3px 0 #0001; }
+    .item.ok { outline: 3px solid #5cc46b; }
+    .item.bad { outline: 3px solid #ff7b7b; }
+    .play { width: 100%; border: 0; background: #fff3c4; border-radius: 12px; padding: 6px 0; font: inherit; }
+    .ar { font-family: "Geeza Pro", "Noto Naskh Arabic", "Amiri", serif; font-size: 2.6rem; line-height: 1.6; direction: rtl; display: block; }
+    .tag { font-size: .75rem; color: #0008; }
+    .marks { display: flex; gap: 6px; margin-top: 6px; }
+    .marks button { flex: 1; border: 0; border-radius: 10px; padding: 8px 0; background: #f0e6d2; font-size: 1.2rem; }
+    textarea { width: 100%; height: 200px; margin-top: 8px; font: inherit; }
+    .btn { font: inherit; padding: 8px 14px; border-radius: 10px; border: 0; background: #ffd54d; }
+  </style>
+</head>
+<body>
+  <h1>Arabic voice re-check</h1>
+  <p class="muted">Only the sounds that were wrong last time. Tap 🔊, listen, then ✓ (right) or ✗ (wrong). When done, tap Copy and paste it to Claude.</p>
+
+  <div id="sections"></div>
+
+  <h2>Result</h2>
+  <button class="btn" id="copy">📋 Copy</button>
+  <textarea id="out" readonly></textarea>
+
+  <script>
+    // shown: what the Iqra book shows; say: what we send to the voice; tag: which trick.
+    const TATWEEL = 'ـ', ZWJ = '‍';
+    const letter = (l, sound) => [
+      { shown: l, say: l, tag: `plain — should be "${sound}"` },
+      { shown: l, say: l + TATWEEL, tag: `tatweel — "${sound}"` },
+      { shown: l, say: l + ZWJ, tag: `joiner — "${sound}"` },
+    ];
+    const SECTIONS = [
+      { title: 'Single letters (heavy sound / read as a word)', hint: 'Iqra says these with a heavy "o"-ish sound: kho, ro, gho, sho.',
+        items: [...letter('خَ', 'kho'), ...letter('رَ', 'ro'), ...letter('غَ', 'gho'), ...letter('صَ', 'sho')] },
+      { title: 'Joined letters and long aa', hint: '',
+        items: [
+          { shown: 'كَلَ', say: 'كَلَ', tag: 'ka-la' },
+          { shown: 'قَالَ', say: 'قَالَ', tag: 'qaa-la' },
+          { shown: 'كَانَ', say: 'كَانَ', tag: 'kaa-na' },
+        ] },
+      { title: 'Fathah berdiri (spoken as long aa)', hint: '',
+        items: [
+          { shown: 'هٰذَا', say: 'هَاذَا', tag: 'haa-dzaa' },
+          { shown: 'ذٰلِكَ', say: 'ذَالِكَ', tag: 'dzaa-li-ka' },
+          { shown: 'لٰكِنْ', say: 'لَاكِنْ', tag: 'laa-kin' },
+          { shown: 'عَلٰى', say: 'عَلَا', tag: 'ʿa-laa' },
+          { shown: 'مُوْسٰى', say: 'مُوْسَا', tag: 'muu-saa' },
+          { shown: 'هُدٰى', say: 'هُدَا', tag: 'hu-daa' },
+        ] },
+      { title: 'Kasrah berdiri (spoken as long ii)', hint: '',
+        items: [
+          { shown: 'بِهٖ', say: 'بِهِيْ', tag: 'bi-hii' },
+          { shown: 'فِيْهٖ', say: 'فِيْهِيْ', tag: 'fii-hii' },
+          { shown: 'رَبِّهٖ', say: 'رَبِّهِيْ', tag: 'rab-bi-hii' },
+        ] },
+      { title: 'Dhammah terbalik (spoken as long uu)', hint: '',
+        items: [
+          { shown: 'لَهٗ', say: 'لَهُوْ', tag: 'la-huu' },
+          { shown: 'بِهٗ', say: 'بِهُوْ', tag: 'bi-huu' },
+          { shown: 'رَسُوْلُهٗ', say: 'رَسُوْلُهُوْ', tag: 'ra-suu-lu-huu' },
+        ] },
+      { title: 'Tanwin fathah', hint: '',
+        items: [
+          { shown: 'بً', say: 'بً', tag: 'plain — "ban"' },
+          { shown: 'بً', say: 'بًا', tag: 'with alif — "ban"' },
+        ] },
+    ];
+
+    const KEY = 'sound-recheck-marks';
+    const marks = JSON.parse(localStorage.getItem(KEY) || '{}');
+
+    function speak(text) {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      const v = speechSynthesis.getVoices().find((x) => x.lang.toLowerCase().startsWith('ar'));
+      if (v) u.voice = v;
+      u.lang = v?.lang ?? 'ar-SA';
+      u.rate = 0.7;
+      speechSynthesis.speak(u);
+    }
+
+    function render() {
+      document.getElementById('sections').innerHTML = SECTIONS.map((s, si) => `
+        <h2>${s.title}</h2>${s.hint ? `<p class="muted">${s.hint}</p>` : ''}
+        <div class="grid">${s.items.map((it, i) => {
+          const id = `${si}-${i}`;
+          return `<div class="item ${marks[id] ?? ''}">
+            <button class="play" data-s="${si}" data-i="${i}"><span class="ar">${it.shown}</span>🔊</button>
+            <div class="tag">${it.tag}</div>
+            <div class="marks"><button data-mark="${id}" data-v="ok">✓</button><button data-mark="${id}" data-v="bad">✗</button></div>
+          </div>`;
+        }).join('')}</div>`).join('');
+      const v = speechSynthesis.getVoices().find((x) => x.lang.toLowerCase().startsWith('ar'));
+      const lines = [`Voice: ${v ? `${v.name} (${v.lang})` : 'tablet default (ar-SA)'}`];
+      SECTIONS.forEach((s, si) => s.items.forEach((it, i) => {
+        const m = marks[`${si}-${i}`];
+        lines.push(`${m === 'ok' ? '✓' : m === 'bad' ? '✗' : '–'} ${it.shown} (${it.tag})`);
+      }));
+      document.getElementById('out').value = lines.join('\n');
+    }
+
+    document.addEventListener('click', (e) => {
+      const play = e.target.closest('[data-s]');
+      if (play) return speak(SECTIONS[play.dataset.s].items[play.dataset.i].say);
+      const mark = e.target.closest('[data-mark]');
+      if (mark) {
+        marks[mark.dataset.mark] = mark.dataset.v;
+        localStorage.setItem(KEY, JSON.stringify(marks));
+        render();
+      }
+    });
+    document.getElementById('copy').addEventListener('click', async () => {
+      const out = document.getElementById('out');
+      try { await navigator.clipboard.writeText(out.value); } catch { out.select(); document.execCommand('copy'); }
+    });
+
+    render();
+    speechSynthesis.addEventListener?.('voiceschanged', render);
+  </script>
+</body>
+</html>
