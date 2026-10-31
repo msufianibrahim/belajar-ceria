@@ -25,20 +25,16 @@ button:disabled { cursor: default; }
 .parent-btn { opacity: .45; width: 44px; height: 44px; font-size: 1.1rem; }
 
 /* ---------- avatar ---------- */
-.hero { text-align: center; padding-top: 40px; }
+.hero { text-align: center; padding-top: 30px; }
 .hero h1 { margin: 16px 0 24px; font-size: 2rem; }
-.hero.small { padding-top: 50px; margin-bottom: 10px; }
-.avatar {
-  --body: #ffd54d;
-  position: relative; width: 150px; height: 150px; margin: 0 auto;
-  border-radius: 50%; background: var(--body);
-  display: grid; place-items: center;
-  box-shadow: inset 0 -10px 0 #0001, 0 6px 0 #0001;
-}
-.avatar .face { font-size: 90px; line-height: 1; }
-.avatar .hat { position: absolute; top: -48px; font-size: 64px; }
-.avatar .pet { position: absolute; right: -40px; bottom: -6px; font-size: 56px; }
-.avatar.big { transform: scale(1.25); margin: 70px auto 40px; }
+.hero.small { padding-top: 30px; margin-bottom: 10px; }
+.avatar { position: relative; width: 170px; height: 255px; margin: 0 auto; }
+.avatar .kid { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 6px 0 #0001); }
+.avatar .pet { position: absolute; right: -44px; bottom: -4px; font-size: 56px; }
+.avatar.big { transform: scale(1.25); margin: 60px auto 40px; }
+.mini-kid { display: block; width: 64px; height: 96px; }
+.mini-kid .kid { width: 100%; height: 100%; overflow: visible; }
+.mini-kid.inline { display: inline-block; width: 40px; height: 60px; vertical-align: middle; }
 
 /* ---------- home ---------- */
 .subjects { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
@@ -164,8 +160,6 @@ button:disabled { cursor: default; }
 }
 .shop-item.on { outline: 4px solid var(--good); }
 .item-e { font-size: 48px; }
-.swatch { width: 52px; height: 52px; border-radius: 50%; display: block; }
-.swatch.inline { display: inline-block; width: 28px; height: 28px; vertical-align: middle; }
 .sheet {
   position: fixed; left: 0; right: 0; bottom: 0; background: #fff; text-align: center; font-size: 1.4rem;
   padding: 20px 20px max(20px, env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; box-shadow: 0 -6px 20px #0002;

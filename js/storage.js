@@ -8,7 +8,7 @@ const defaults = () => ({
   coins: 0,
   stickers: [],                 // sticker ids collected
   owned: ['c-yellow'],          // shop item ids
-  equipped: { color: 'c-yellow', hat: null, pet: null },
+  equipped: { color: 'c-yellow', pants: 'tr-blue', hat: null, extra: null, pet: null },
   levels: {},                   // levelId -> { best, cleared, perfectDays[], mastered }
   frontier: {},                 // subjectId -> furthest open level id (see progress.js)
   placed: {},                   // subjectId -> true once placement is done

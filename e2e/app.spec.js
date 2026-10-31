@@ -132,7 +132,16 @@ test('shop: asks to save up when short, buys and wears when affordable', async (
   await page.getByRole('button', { name: 'Buy!' }).click();
   await expect(coins(page)).toHaveText('🪙 5');
   await expect(page.locator('[data-arg="h-cap"]')).toContainText('Wearing');
-  await expect(page.locator('.avatar .hat')).toHaveText('🧢');
+  await expect(page.locator('.avatar [data-item="h-cap"]')).toHaveCount(1);
+});
+
+test('shop: new free trousers can be worn by an old save; tapping a worn hat takes it off', async ({ page }) => {
+  await open(page, { coins: 0, owned: ['c-yellow', 'h-cap'], equipped: { color: 'c-yellow', hat: 'h-cap', pet: null } });
+  await page.getByRole('button', { name: /Shop/ }).click();
+  await expect(page.locator('[data-arg="tr-blue"]')).toContainText('Wearing');
+  await page.locator('[data-arg="h-cap"]').click();
+  await expect(page.locator('.avatar [data-item="h-cap"]')).toHaveCount(0);
+  await expect(page.locator('[data-arg="h-cap"]')).toContainText('Wear');
 });
 
 test('time limit: avatar sleeps when time is up; parent can end the rest', async ({ page }) => {

@@ -6,6 +6,7 @@ import { topIndex, isOpen, openUpTo, pickReview, answerMode } from './progress.j
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
+import { avatarSvg } from './avatar.js';
 import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
 
 const ROUND = 5;                // questions per round
@@ -20,6 +21,8 @@ let view = { name: 'home' };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const subjectById = (id) => SUBJECTS.find((s) => s.id === id);
 const shopItem = (id) => SHOP.find((i) => i.id === id);
+const owns = (id) => shopItem(id)?.price === 0 || state.owned.includes(id); // free items are always his
+const ALWAYS_WORN = ['color', 'pants'];
 const persist = () => save(state);
 // App language: tr('English', 'BM') picks one; N() picks from a { en, ms } pair in data.
 const tr = (en, ms) => (state.settings.lang === 'ms' ? ms : en);
@@ -72,13 +75,21 @@ function render() {
 
 // ---------------------------------------------------------------- shared bits
 
-function avatar(face = '😊', size = '') {
-  const color = shopItem(state.equipped.color)?.value ?? '#ffd54d';
-  const hat = shopItem(state.equipped.hat)?.value;
+// What he's wearing, optionally with one item swapped in (for shop previews).
+function look(tryOn) {
+  const eq = { ...state.equipped, ...(tryOn ? { [tryOn.cat]: tryOn.id } : {}) };
+  return {
+    shirt: shopItem(eq.color)?.value ?? '#ffd54d',
+    pants: shopItem(eq.pants)?.value ?? '#3f6fb5',
+    hat: eq.hat,
+    extra: eq.extra,
+  };
+}
+
+function avatar(mood = 'smile', size = '') {
   const pet = shopItem(state.equipped.pet)?.value;
-  return `<div class="avatar ${size}" style="--body:${color}">
-    ${hat ? `<span class="hat">${hat}</span>` : ''}
-    <span class="face">${face}</span>
+  return `<div class="avatar ${size}">
+    ${avatarSvg(look(), mood)}
     ${pet ? `<span class="pet">${pet}</span>` : ''}
   </div>`;
 }
@@ -173,7 +184,7 @@ function resultsScreen() {
   if (!res.passed) lines.push(tr("💪 Let's try once more — you can do it!", '💪 Jom cuba sekali lagi — kamu boleh!'));
   const emoji = res.score === res.total ? ' 🎉' : res.passed ? ' 👏' : '';
   return `<section class="results">
-    ${avatar(res.passed ? '😄' : '🙂')}
+    ${avatar(res.passed ? 'happy' : 'smile')}
     <h1>${resultTitle(res)}${emoji}</h1>
     <div class="stars big">${stars(res.score, res.total)}</div>
     <ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul>
@@ -193,13 +204,14 @@ function stickersScreen() {
 }
 
 function shopScreen() {
-  const cats = [['color', tr('Colours', 'Warna')], ['hat', tr('Hats', 'Topi')], ['pet', tr('Pets', 'Haiwan')]];
+  const cats = [['color', tr('Shirts', 'Baju')], ['pants', tr('Trousers', 'Seluar')], ['hat', tr('Hats', 'Topi')],
+    ['extra', tr('Extras', 'Aksesori')], ['pet', tr('Pets', 'Haiwan')]];
   const rows = cats.map(([cat, label]) => `<h3>${label}</h3><div class="shop-row">${SHOP.filter((i) => i.cat === cat).map((i) => {
-    const owned = state.owned.includes(i.id);
+    const owned = owns(i.id);
     const on = state.equipped[cat] === i.id;
-    const face = cat === 'color'
-      ? `<span class="swatch" style="background:${i.value}"></span>`
-      : `<span class="item-e">${i.value}</span>`;
+    const face = cat === 'pet'
+      ? `<span class="item-e">${i.value}</span>`
+      : `<span class="mini-kid">${avatarSvg(look(i))}</span>`;
     return `<button class="shop-item ${on ? 'on' : ''}" data-act="shopItem" data-arg="${i.id}">${face}<small>${on ? tr('✓ Wearing', '✓ Dipakai') : owned ? tr('Wear', 'Pakai') : `🪙 ${i.price}`}</small></button>`;
   }).join('')}</div>`).join('');
 
@@ -207,7 +219,7 @@ function shopScreen() {
   const p = view.pending && shopItem(view.pending);
   if (p) {
     const short = p.price - state.coins;
-    const icon = p.cat === 'color' ? `<span class="swatch inline" style="background:${p.value}"></span>` : p.value;
+    const icon = p.cat === 'pet' ? p.value : `<span class="mini-kid inline">${avatarSvg(look(p))}</span>`;
     sheet = `<div class="sheet">
       <div>${icon} ${N(p.label)} — 🪙 ${p.price}</div>
       ${short > 0
@@ -220,7 +232,7 @@ function shopScreen() {
 
 function sleepyScreen() {
   return `<section class="sleepy">
-    ${avatar('😴', 'big')}
+    ${avatar('sleepy', 'big')}
     <h1>${tr('Rest time!', 'Masa rehat!')}</h1>
     <p>${tr('Drink some water, play outside, or read a book with Mum &amp; Dad.', 'Jom minum air, main di luar, atau baca buku dengan Ayah &amp; Ibu.')}</p>
     <p class="muted">${tr('See you again at', 'Jumpa lagi pukul')} ${clock(state.session.restUntil)} 🌙</p>
@@ -426,10 +438,10 @@ function finishRound() {
 
 function shopTap(id) {
   const it = shopItem(id);
-  if (state.owned.includes(id)) {
-    // Tapping a worn hat/pet takes it off; a colour is always worn.
+  if (owns(id)) {
+    // Tapping a worn hat/extra/pet takes it off; a shirt and trousers are always worn.
     const wearing = state.equipped[it.cat] === id;
-    state.equipped[it.cat] = wearing && it.cat !== 'color' ? null : id;
+    state.equipped[it.cat] = wearing && !ALWAYS_WORN.includes(it.cat) ? null : id;
     persist();
     render();
     return;
@@ -442,7 +454,7 @@ function shopTap(id) {
 function buy() {
   const it = shopItem(view.pending);
   view.pending = null;
-  if (it && state.coins >= it.price && !state.owned.includes(it.id)) {
+  if (it && state.coins >= it.price && !owns(it.id)) {
     state.coins -= it.price;
     state.owned.push(it.id);
     state.equipped[it.cat] = it.id;
