@@ -37,6 +37,8 @@
       <option value="zwj">Penyambung halimunan</option>
       <option value="twice">Sebut 2 kali</option>
     </select></label>
+    <label><input id="spell" type="checkbox" checked> Ejaan sebutan (berdiri/terbalik)</label>
+    <button id="reset">Padam semua tanda</button>
     <label>Laju: <input id="rate" type="range" min="0.4" max="1.1" step="0.1" value="0.7"> <span id="rateVal">0.7</span></label>
   </div>
   <p id="noVoice" class="muted" hidden>Pelayar tidak menyenaraikan suara Arab, jadi suara Arab lalai tablet akan digunakan. Kalau tiada bunyi langsung, pasang suara Arab dalam tetapan Text-to-speech tablet.</p>
@@ -108,9 +110,21 @@
       return text;
     }
 
+    // The voice ignores the small long-vowel marks, so speak an equivalent spelling:
+    // fathah berdiri (+ dotless ya) -> fathah + alif, kasrah berdiri -> kasrah + ya,
+    // dhammah terbalik -> dhammah + wau. The page still shows the real Iqra spelling.
+    function speakable(t) {
+      if (!document.getElementById('spell').checked) return t;
+      return t
+        .replace(/\u0670\u0649/g, '\u064E\u0627')
+        .replace(/\u0670/g, '\u064E\u0627')
+        .replace(/\u0656/g, '\u0650\u064A\u0652')
+        .replace(/\u0657/g, '\u064F\u0648\u0652');
+    }
+
     function speak(text) {
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(variant(text));
+      const u = new SpeechSynthesisUtterance(variant(speakable(text)));
       const v = voices[document.getElementById('voice').value];
       if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'ar-SA'; }
       u.rate = Number(document.getElementById('rate').value);
@@ -133,7 +147,7 @@
 
     function renderOut() {
       const v = voices[document.getElementById('voice').value];
-      const lines = [`Suara: ${v ? `${v.name} (${v.lang})` : 'lalai tablet (ar-SA)'}`, `Pelayar: ${navigator.userAgent}`, `Laju: ${document.getElementById('rate').value}`, `Cara huruf tunggal: ${document.getElementById('mode').value}`];
+      const lines = [`Suara: ${v ? `${v.name} (${v.lang})` : 'lalai tablet (ar-SA)'}`, `Pelayar: ${navigator.userAgent}`, `Laju: ${document.getElementById('rate').value}`, `Cara huruf tunggal: ${document.getElementById('mode').value}`, `Ejaan sebutan: ${document.getElementById('spell').checked ? 'ya' : 'tidak'}`];
       for (const s of SECTIONS) {
         const bad = s.items.filter((_, i) => marks[`${s.id}-${i}`] === 'bad');
         const done = s.items.filter((_, i) => marks[`${s.id}-${i}`]).length;
@@ -158,6 +172,13 @@
     });
     document.getElementById('voice').addEventListener('change', renderOut);
     document.getElementById('mode').addEventListener('change', renderOut);
+    document.getElementById('spell').addEventListener('change', renderOut);
+    document.getElementById('reset').addEventListener('click', () => {
+      if (!confirm('Padam semua tanda ✓/✗?')) return;
+      for (const k of Object.keys(marks)) delete marks[k];
+      localStorage.setItem(KEY, '{}');
+      render();
+    });
 
     render();
     fillVoices();
