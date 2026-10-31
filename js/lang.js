@@ -3,11 +3,14 @@
 
 export const VOICE = { ms: 'ms-MY', en: 'en-GB', zh: 'zh-CN' };
 
+// Pick the app language from a { en, ms } pair; plain strings pass through.
+export const L = (state, v) => (v && typeof v === 'object' ? v[state.settings.lang] ?? v.en : v);
+
 export function questionLang(state, levelId) {
-  const { mathLang, mandarin } = state.settings;
+  const { lang, mandarin } = state.settings;
   if (mandarin === 'all') return 'zh';
   if (mandarin === 'mastered' && state.levels[levelId]?.mastered) return 'zh';
-  return mathLang;
+  return lang;
 }
 
 const PINYIN = ['líng', 'yī', 'èr', 'sān', 'sì', 'wǔ', 'liù', 'qī', 'bā', 'jiǔ', 'shí'];

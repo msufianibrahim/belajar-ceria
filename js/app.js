@@ -6,7 +6,7 @@ import { topIndex, openUpTo, pickReview, answerMode } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
-import { questionLang, VOICE, PRAISE, RETRY } from './lang.js';
+import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
 
 const ROUND = 5;                // questions per round
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
@@ -21,8 +21,11 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const subjectById = (id) => SUBJECTS.find((s) => s.id === id);
 const shopItem = (id) => SHOP.find((i) => i.id === id);
 const persist = () => save(state);
-const say = (text, lang = 'ms') => state.settings.voice && speak(text, VOICE[lang]);
-const clock = (ms) => new Date(ms).toLocaleTimeString('ms-MY', { hour: 'numeric', minute: '2-digit' });
+// App language: tr('English', 'BM') picks one; N() picks from a { en, ms } pair in data.
+const tr = (en, ms) => (state.settings.lang === 'ms' ? ms : en);
+const N = (v) => esc(L(state, v));
+const say = (text, lang = state.settings.lang) => state.settings.voice && speak(text, VOICE[lang]);
+const clock = (ms) => new Date(ms).toLocaleTimeString(tr('en-MY', 'ms-MY'), { hour: 'numeric', minute: '2-digit' });
 
 // ---------------------------------------------------------------- session limit
 
@@ -47,7 +50,7 @@ function go(name, data = {}) {
   if (KID_SCREENS.has(name) && name !== 'results' && mustRest()) {
     view = { name: 'sleepy' };
     render();
-    say('Masa untuk rehat. Jumpa lagi nanti!');
+    say(tr('Time for a rest. See you later!', 'Masa untuk rehat. Jumpa lagi nanti!'));
     return false;
   }
   view = { name, ...data };
@@ -61,6 +64,7 @@ function render() {
     results: resultsScreen, stickers: stickersScreen, shop: shopScreen,
     sleepy: sleepyScreen, gate: gateScreen, parent: parentScreen,
   };
+  document.documentElement.lang = state.settings.lang;
   app.innerHTML = screens[view.name]();
   window.scrollTo(0, 0);
   if (view.name === 'gate') app.querySelector('input')?.focus();
@@ -80,7 +84,7 @@ function avatar(face = '😊', size = '') {
 }
 
 const topBar = (title) => `<header class="top">
-  <button class="icon-btn" data-act="back" aria-label="Kembali">⬅️</button>
+  <button class="icon-btn" data-act="back" aria-label="${tr('Back', 'Kembali')}">⬅️</button>
   <h2>${title}</h2>
   <div class="coins">🪙 ${state.coins}</div>
 </header>`;
@@ -92,19 +96,19 @@ const stars = (n, total) => '★'.repeat(n) + '☆'.repeat(Math.max(0, total - n
 function homeScreen() {
   const name = state.childName ? `, ${esc(state.childName)}` : '';
   const tiles = SUBJECTS.map((s) => s.levels.length
-    ? `<button class="tile" style="--c:${s.color}" data-act="subject" data-arg="${s.id}"><span class="tile-icon">${s.icon}</span>${s.name}</button>`
-    : `<button class="tile locked" style="--c:${s.color}" disabled><span class="tile-icon">${s.icon}</span>${s.name}<small>Akan datang</small></button>`
+    ? `<button class="tile" style="--c:${s.color}" data-act="subject" data-arg="${s.id}"><span class="tile-icon">${s.icon}</span>${N(s.name)}</button>`
+    : `<button class="tile locked" style="--c:${s.color}" disabled><span class="tile-icon">${s.icon}</span>${N(s.name)}<small>${tr('Coming soon', 'Akan datang')}</small></button>`
   ).join('');
   return `<header class="top">
       <div class="coins">🪙 ${state.coins}</div>
-      <button class="icon-btn parent-btn" data-act="gate" aria-label="Ibu bapa">⚙️</button>
+      <button class="icon-btn parent-btn" data-act="gate" aria-label="${tr('Parents', 'Ibu bapa')}">⚙️</button>
     </header>
     <section class="hero">${avatar()}<h1>Assalamualaikum${name}!</h1></section>
     <section class="subjects">${tiles}</section>
-    ${pickReview(state, SUBJECTS, todayKey()) ? '<button class="big-btn review" data-act="review">🔁 Ulang kaji <small>— dapatkan 👑</small></button>' : ''}
+    ${pickReview(state, SUBJECTS, todayKey()) ? `<button class="big-btn review" data-act="review">🔁 ${tr('Review', 'Ulang kaji')} <small>— ${tr('earn', 'dapatkan')} 👑</small></button>` : ''}
     <nav class="bottom">
-      <button class="big-btn" data-act="go" data-arg="stickers">📒 Pelekat <b>${state.stickers.length}</b></button>
-      <button class="big-btn" data-act="go" data-arg="shop">🛍️ Kedai</button>
+      <button class="big-btn" data-act="go" data-arg="stickers">📒 ${tr('Stickers', 'Pelekat')} <b>${state.stickers.length}</b></button>
+      <button class="big-btn" data-act="go" data-arg="shop">🛍️ ${tr('Shop', 'Kedai')}</button>
     </nav>`;
 }
 
@@ -119,11 +123,11 @@ function subjectScreen() {
     const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS}</span>` : '';
     return `<li><button class="level ${locked ? 'locked' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
-      <span class="lvl-title">${l.icon} ${l.title} ${zh} ${toward}</span>
+      <span class="lvl-title">${l.icon} ${N(l.title)} ${zh} ${toward}</span>
       <span class="stars">${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
-  return `${topBar(`${s.icon} ${s.name}`)}<ol class="path">${items}</ol>`;
+  return `${topBar(`${s.icon} ${N(s.name)}`)}<ol class="path">${items}</ol>`;
 }
 
 function questionScreen() {
@@ -131,7 +135,7 @@ function questionScreen() {
   const dots = view.name === 'play'
     ? view.qs.map((_, k) => `<span class="${k < view.i ? 'done' : k === view.i ? 'now' : ''}"></span>`).join('')
     : '<span class="now"></span>';
-  return `${topBar(view.name === 'placement' ? 'Jom main!' : '')}
+  return `${topBar(view.name === 'placement' ? tr("Let's play!", 'Jom main!') : '')}
     <div class="dots">${dots}</div>
     <div class="question">
       ${q.visual ? `<div class="visual">${q.visual}</div>` : ''}
@@ -146,28 +150,28 @@ function questionScreen() {
 const keypad = () => `<div class="typed">${view.typed || '?'}</div>
   <div class="keypad">
     ${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => `<button class="key" data-act="key" data-arg="${d}">${d}</button>`).join('')}
-    <button class="key del" data-act="del" aria-label="Padam">⌫</button>
+    <button class="key del" data-act="del" aria-label="${tr('Delete', 'Padam')}">⌫</button>
     <button class="key" data-act="key" data-arg="0">0</button>
-    <button class="key ok" data-act="enter" aria-label="Hantar">✓</button>
+    <button class="key ok" data-act="enter" aria-label="${tr('Enter', 'Hantar')}">✓</button>
   </div>`;
 
 function resultTitle(res) {
-  if (res.score === res.total) return 'Hebat! Semua betul!';
-  if (res.passed) return 'Bagus!';
-  return 'Kamu sudah cuba!';
+  if (res.score === res.total) return tr('Amazing! All correct!', 'Hebat! Semua betul!');
+  if (res.passed) return tr('Well done!', 'Bagus!');
+  return tr('Good try!', 'Kamu sudah cuba!');
 }
 
 function resultsScreen() {
   const { res, retries } = view;
   const lines = [];
-  if (res.coins) lines.push(`🪙 +${res.coins} syiling`);
-  if (res.sticker) lines.push(`${res.sticker.e} Pelekat baru!`);
-  if (res.newBest) lines.push('⬆️ Markah terbaik baru!');
-  if (res.needsTyping) lines.push('⌨️ Lain kali taip jawapan untuk dapat 👑');
-  if (res.justMastered) lines.push('👑 Kamu sudah mahir!');
-  else if (res.masteryProgress) lines.push(`👑 Mahir: ${res.masteryProgress}/${MASTERY_DAYS} hari — main lagi hari lain!`);
-  if (retries && res.passed) lines.push('🌱 Kamu terus mencuba — itu hebat!');
-  if (!res.passed) lines.push('💪 Jom cuba sekali lagi — kamu boleh!');
+  if (res.coins) lines.push(`🪙 +${res.coins} ${tr('coins', 'syiling')}`);
+  if (res.sticker) lines.push(`${res.sticker.e} ${tr('New sticker!', 'Pelekat baru!')}`);
+  if (res.newBest) lines.push(tr('⬆️ New best score!', '⬆️ Markah terbaik baru!'));
+  if (res.needsTyping) lines.push(tr('⌨️ Next time, type the answer to earn 👑', '⌨️ Lain kali taip jawapan untuk dapat 👑'));
+  if (res.justMastered) lines.push(tr('👑 You mastered it!', '👑 Kamu sudah mahir!'));
+  else if (res.masteryProgress) lines.push(tr(`👑 Mastery: ${res.masteryProgress}/${MASTERY_DAYS} days — play again another day!`, `👑 Mahir: ${res.masteryProgress}/${MASTERY_DAYS} hari — main lagi hari lain!`));
+  if (retries && res.passed) lines.push(tr('🌱 You kept trying — that is great!', '🌱 Kamu terus mencuba — itu hebat!'));
+  if (!res.passed) lines.push(tr("💪 Let's try once more — you can do it!", '💪 Jom cuba sekali lagi — kamu boleh!'));
   const emoji = res.score === res.total ? ' 🎉' : res.passed ? ' 👏' : '';
   return `<section class="results">
     ${avatar(res.passed ? '😄' : '🙂')}
@@ -175,29 +179,29 @@ function resultsScreen() {
     <div class="stars big">${stars(res.score, res.total)}</div>
     <ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul>
     <div class="row">
-      <button class="big-btn" data-act="play" data-arg="${view.levelIdx}">🔁 Main lagi</button>
-      <button class="big-btn primary" data-act="subject" data-arg="${view.subjectId}">➡️ Seterusnya</button>
+      <button class="big-btn" data-act="play" data-arg="${view.levelIdx}">🔁 ${tr('Play again', 'Main lagi')}</button>
+      <button class="big-btn primary" data-act="subject" data-arg="${view.subjectId}">➡️ ${tr('Next', 'Seterusnya')}</button>
     </div>
   </section>`;
 }
 
 function stickersScreen() {
   const cells = allStickers().map((s) => state.stickers.includes(s.id)
-    ? `<div class="sticker">${s.e}<small>${esc(s.label)}</small></div>`
+    ? `<div class="sticker">${s.e}<small>${N(s.label)}</small></div>`
     : '<div class="sticker empty">?</div>'
   ).join('');
-  return `${topBar('📒 Buku Pelekat')}<section class="sticker-grid">${cells}</section>`;
+  return `${topBar(tr('📒 Sticker Book', '📒 Buku Pelekat'))}<section class="sticker-grid">${cells}</section>`;
 }
 
 function shopScreen() {
-  const cats = [['color', 'Warna'], ['hat', 'Topi'], ['pet', 'Haiwan']];
+  const cats = [['color', tr('Colours', 'Warna')], ['hat', tr('Hats', 'Topi')], ['pet', tr('Pets', 'Haiwan')]];
   const rows = cats.map(([cat, label]) => `<h3>${label}</h3><div class="shop-row">${SHOP.filter((i) => i.cat === cat).map((i) => {
     const owned = state.owned.includes(i.id);
     const on = state.equipped[cat] === i.id;
     const face = cat === 'color'
       ? `<span class="swatch" style="background:${i.value}"></span>`
       : `<span class="item-e">${i.value}</span>`;
-    return `<button class="shop-item ${on ? 'on' : ''}" data-act="shopItem" data-arg="${i.id}">${face}<small>${on ? '✓ Dipakai' : owned ? 'Pakai' : `🪙 ${i.price}`}</small></button>`;
+    return `<button class="shop-item ${on ? 'on' : ''}" data-act="shopItem" data-arg="${i.id}">${face}<small>${on ? tr('✓ Wearing', '✓ Dipakai') : owned ? tr('Wear', 'Pakai') : `🪙 ${i.price}`}</small></button>`;
   }).join('')}</div>`).join('');
 
   let sheet = '';
@@ -206,32 +210,32 @@ function shopScreen() {
     const short = p.price - state.coins;
     const icon = p.cat === 'color' ? `<span class="swatch inline" style="background:${p.value}"></span>` : p.value;
     sheet = `<div class="sheet">
-      <div>${icon} ${esc(p.label)} — 🪙 ${p.price}</div>
+      <div>${icon} ${N(p.label)} — 🪙 ${p.price}</div>
       ${short > 0
-        ? `<p>Kumpul lagi 🪙 ${short} dulu!</p><div class="row"><button class="big-btn" data-act="buyNo">OK</button></div>`
-        : `<div class="row"><button class="big-btn" data-act="buyNo">Tidak</button><button class="big-btn primary" data-act="buyYes">Beli!</button></div>`}
+        ? `<p>${tr(`Collect 🪙 ${short} more first!`, `Kumpul lagi 🪙 ${short} dulu!`)}</p><div class="row"><button class="big-btn" data-act="buyNo">OK</button></div>`
+        : `<div class="row"><button class="big-btn" data-act="buyNo">${tr('No', 'Tidak')}</button><button class="big-btn primary" data-act="buyYes">${tr('Buy!', 'Beli!')}</button></div>`}
     </div>`;
   }
-  return `${topBar('🛍️ Kedai')}<section class="hero small">${avatar()}</section>${rows}${sheet}`;
+  return `${topBar(`🛍️ ${tr('Shop', 'Kedai')}`)}<section class="hero small">${avatar()}</section>${rows}${sheet}`;
 }
 
 function sleepyScreen() {
   return `<section class="sleepy">
     ${avatar('😴', 'big')}
-    <h1>Masa rehat!</h1>
-    <p>Jom minum air, main di luar, atau baca buku dengan Ayah &amp; Ibu.</p>
-    <p class="muted">Jumpa lagi pukul ${clock(state.session.restUntil)} 🌙</p>
-    <button class="icon-btn corner" data-act="gate" aria-label="Ibu bapa">⚙️</button>
+    <h1>${tr('Rest time!', 'Masa rehat!')}</h1>
+    <p>${tr('Drink some water, play outside, or read a book with Mum &amp; Dad.', 'Jom minum air, main di luar, atau baca buku dengan Ayah &amp; Ibu.')}</p>
+    <p class="muted">${tr('See you again at', 'Jumpa lagi pukul')} ${clock(state.session.restUntil)} 🌙</p>
+    <button class="icon-btn corner" data-act="gate" aria-label="${tr('Parents', 'Ibu bapa')}">⚙️</button>
   </section>`;
 }
 
 function gateScreen() {
-  return `${topBar('Untuk Ibu Bapa')}
+  return `${topBar(tr('For Parents', 'Untuk Ibu Bapa'))}
     <form class="gate" id="gate-form">
-      <p>Jawab untuk masuk:</p>
+      <p>${tr('Answer to enter:', 'Jawab untuk masuk:')}</p>
       <h1>${view.a} × ${view.b} = ?</h1>
       <input type="number" inputmode="numeric" autocomplete="off">
-      <p><button class="btn" type="submit">Masuk</button></p>
+      <p><button class="btn" type="submit">${tr('Enter', 'Masuk')}</button></p>
     </form>`;
 }
 
@@ -241,45 +245,47 @@ function parentScreen() {
   const textSelect = (key, opts) => `<select data-setting="${key}" data-kind="text">${opts.map(([v, label]) =>
     `<option value="${v}" ${state.settings[key] === v ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
   const select = (key, vals) => `<select data-setting="${key}">${vals.map((v) =>
-    `<option value="${v}" ${state.settings[key] === v ? 'selected' : ''}>${v} minit</option>`).join('')}</select>`;
+    `<option value="${v}" ${state.settings[key] === v ? 'selected' : ''}>${v} ${tr('min', 'minit')}</option>`).join('')}</select>`;
   const progress = SUBJECTS.filter((sub) => sub.levels.length).map((sub) => `
-    <h4>${sub.icon} ${sub.name}</h4>
+    <h4>${sub.icon} ${N(sub.name)}</h4>
     <table>${sub.levels.map((l) => {
       const r = state.levels[l.id];
-      const mastery = r?.mastered ? '👑 Mahir' : r ? `Mahir ${r.perfectDays.length}/${MASTERY_DAYS}` : '';
-      return `<tr><td>${l.title}</td><td>${r ? `${r.best}/${ROUND}` : '–'}</td><td>${mastery}</td></tr>`;
+      const mastery = r?.mastered ? tr('👑 Mastered', '👑 Mahir') : r ? `${tr('Mastery', 'Mahir')} ${r.perfectDays.length}/${MASTERY_DAYS}` : '';
+      return `<tr><td>${N(l.title)}</td><td>${r ? `${r.best}/${ROUND}` : '–'}</td><td>${mastery}</td></tr>`;
     }).join('')}</table>`).join('');
   const tasks = REAL_WORLD.map((t) => {
     const has = state.stickers.includes(t.id);
-    return `<div class="task"><span>${t.e} ${esc(t.label)}</span>
-      <button class="btn" data-act="award" data-arg="${t.id}" ${has ? 'disabled' : ''}>${has ? '✓ Diberi' : 'Beri pelekat'}</button></div>`;
+    return `<div class="task"><span>${t.e} ${N(t.label)}</span>
+      <button class="btn" data-act="award" data-arg="${t.id}" ${has ? 'disabled' : ''}>${has ? tr('✓ Given', '✓ Diberi') : tr('Give sticker', 'Beri pelekat')}</button></div>`;
   }).join('');
 
-  return `${topBar('⚙️ Ibu Bapa')}
-    <section class="panel"><h3>Profil</h3>
-      <label>Nama anak <input id="child-name" value="${esc(state.childName)}" maxlength="20"></label>
+  return `${topBar(`⚙️ ${tr('Parents', 'Ibu Bapa')}`)}
+    <section class="panel"><h3>${tr('Language / Bahasa', 'Bahasa / Language')}</h3>
+      <label>${tr('App and questions', 'Aplikasi dan soalan')} ${textSelect('lang', [['en', 'English'], ['ms', 'Bahasa Melayu']])}</label>
     </section>
-    <section class="panel"><h3>Had masa</h3>
-      <label>Masa main setiap sesi ${select('sessionMinutes', [10, 15, 20, 30, 45])}</label>
-      <label>Masa rehat ${select('restMinutes', [30, 60, 120, 240])}</label>
-      <p class="muted">Sesi ini: ${Math.round(s.usedMs / 60000)} minit${resting ? ` · Sedang rehat hingga ${clock(s.restUntil)}` : ''}</p>
-      ${resting ? '<button class="btn" data-act="endRest">Tamatkan rehat sekarang</button>' : ''}
-      <label>Suara arahan <input type="checkbox" data-setting="voice" ${state.settings.voice ? 'checked' : ''}></label>
+    <section class="panel"><h3>${tr('Profile', 'Profil')}</h3>
+      <label>${tr("Child's name", 'Nama anak')} <input id="child-name" value="${esc(state.childName)}" maxlength="20"></label>
     </section>
-    <section class="panel"><h3>Bahasa Matematik</h3>
-      <label>Bahasa soalan ${textSelect('mathLang', [['ms', 'BM'], ['en', 'English']])}</label>
-      <label>华文 (Mandarin) ${textSelect('mandarin', [['off', 'Tutup'], ['mastered', 'Tahap 👑 sahaja'], ['all', 'Semua tahap']])}</label>
-      <p class="muted">Tahap 👑 sahaja: soalan dalam 华文 + pinyin + sari kata English untuk tahap yang sudah mahir, supaya hanya bahasa yang baru.</p>
+    <section class="panel"><h3>${tr('Time limit', 'Had masa')}</h3>
+      <label>${tr('Play time per session', 'Masa main setiap sesi')} ${select('sessionMinutes', [10, 15, 20, 30, 45])}</label>
+      <label>${tr('Rest time', 'Masa rehat')} ${select('restMinutes', [30, 60, 120, 240])}</label>
+      <p class="muted">${tr('This session', 'Sesi ini')}: ${Math.round(s.usedMs / 60000)} ${tr('min', 'minit')}${resting ? ` · ${tr('Resting until', 'Sedang rehat hingga')} ${clock(s.restUntil)}` : ''}</p>
+      ${resting ? `<button class="btn" data-act="endRest">${tr('End rest now', 'Tamatkan rehat sekarang')}</button>` : ''}
+      <label>${tr('Voice', 'Suara arahan')} <input type="checkbox" data-setting="voice" ${state.settings.voice ? 'checked' : ''}></label>
     </section>
-    <section class="panel"><h3>Hadiah dunia sebenar</h3>
-      <p class="muted">Beri pelekat bila anak buat aktiviti ini bersama anda.</p>${tasks}
+    <section class="panel"><h3>${tr('Maths in Mandarin', 'Matematik dalam 华文')}</h3>
+      <label>华文 (Mandarin) ${textSelect('mandarin', [['off', tr('Off', 'Tutup')], ['mastered', tr('👑 levels only', 'Tahap 👑 sahaja')], ['all', tr('All levels', 'Semua tahap')]])}</label>
+      <p class="muted">${tr('👑 levels only: mastered levels ask in 华文 + pinyin + English subtitle, so only the language is new.', 'Tahap 👑 sahaja: soalan dalam 华文 + pinyin + sari kata English untuk tahap yang sudah mahir, supaya hanya bahasa yang baru.')}</p>
     </section>
-    <section class="panel"><h3>Kemajuan</h3>${progress}</section>
+    <section class="panel"><h3>${tr('Real-world rewards', 'Hadiah dunia sebenar')}</h3>
+      <p class="muted">${tr('Give a sticker when your child does these with you.', 'Beri pelekat bila anak buat aktiviti ini bersama anda.')}</p>${tasks}
+    </section>
+    <section class="panel"><h3>${tr('Progress', 'Kemajuan')}</h3>${progress}</section>
     <section class="panel"><h3>Data</h3>
-      <p class="muted">Data disimpan dalam tablet ini sahaja. Simpan salinan sekali-sekala.</p>
-      <button class="btn" data-act="exportData">⬇️ Simpan salinan</button>
-      <label class="btn">⬆️ Pulihkan salinan<input id="import-file" type="file" accept="application/json,.json" hidden></label>
-      <button class="btn danger" data-act="reset">Padam semua kemajuan</button>
+      <p class="muted">${tr('Data is saved on this tablet only. Save a backup now and then.', 'Data disimpan dalam tablet ini sahaja. Simpan salinan sekali-sekala.')}</p>
+      <button class="btn" data-act="exportData">⬇️ ${tr('Save backup', 'Simpan salinan')}</button>
+      <label class="btn">⬆️ ${tr('Restore backup', 'Pulihkan salinan')}<input id="import-file" type="file" accept="application/json,.json" hidden></label>
+      <button class="btn danger" data-act="reset">${tr('Delete all progress', 'Padam semua kemajuan')}</button>
     </section>`;
 }
 
@@ -332,7 +338,7 @@ function placementAnswer(right, el) {
         state.placed[s.id] = true;
         openUpTo(state, s, v.levelIdx);
         persist();
-        if (go('subject', { subjectId: s.id })) say('Hebat! Jom mula belajar!');
+        if (go('subject', { subjectId: s.id })) say(tr("Great! Let's start learning!", 'Hebat! Jom mula belajar!'));
         return;
       }
     }
@@ -429,7 +435,7 @@ function shopTap(id) {
   }
   view.pending = id;
   render();
-  say(`${it.label}. ${it.price} syiling.`);
+  say(`${L(state, it.label)}. ${it.price} ${tr('coins', 'syiling')}.`);
 }
 
 function buy() {
@@ -461,13 +467,13 @@ async function importFile(file) {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
-    if (!confirm('Ganti semua data sekarang dengan salinan ini?')) return;
+    if (!confirm(tr('Replace all current data with this backup?', 'Ganti semua data sekarang dengan salinan ini?'))) return;
     state = fromJson(data);
     persist();
-    alert('Data dipulihkan.');
+    alert(tr('Data restored.', 'Data dipulihkan.'));
     render();
   } catch {
-    alert('Fail tidak sah.');
+    alert(tr('Invalid file.', 'Fail tidak sah.'));
   }
 }
 
@@ -506,7 +512,7 @@ const ACTIONS = {
   },
   exportData,
   reset: () => {
-    if (!confirm('Padam SEMUA kemajuan, syiling dan pelekat? Ini tidak boleh dibatalkan.')) return;
+    if (!confirm(tr('Delete ALL progress, coins and stickers? This cannot be undone.', 'Padam SEMUA kemajuan, syiling dan pelekat? Ini tidak boleh dibatalkan.'))) return;
     state = fromJson({});
     persist();
     go('home');
@@ -523,7 +529,7 @@ app.addEventListener('submit', (e) => {
   e.preventDefault();
   const input = e.target.querySelector('input');
   if (Number(input.value) === view.a * view.b) go('parent');
-  else { input.value = ''; input.placeholder = 'Cuba lagi'; }
+  else { input.value = ''; input.placeholder = tr('Try again', 'Cuba lagi'); }
 });
 
 app.addEventListener('change', (e) => {
@@ -531,6 +537,7 @@ app.addEventListener('change', (e) => {
   if (t.dataset.setting) {
     state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : t.dataset.kind === 'text' ? t.value : Number(t.value);
     persist();
+    if (t.dataset.setting === 'lang') render();
   } else if (t.id === 'child-name') {
     state.childName = t.value.trim().slice(0, 20);
     persist();

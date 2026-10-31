@@ -12,8 +12,8 @@ const defaults = () => ({
   levels: {},                   // levelId -> { best, cleared, perfectDays[], mastered }
   frontier: {},                 // subjectId -> furthest open level id (see progress.js)
   placed: {},                   // subjectId -> true once placement is done
-  // mathLang: base question language; mandarin: 'off' | 'mastered' | 'all' (see lang.js)
-  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, mathLang: 'en', mandarin: 'mastered' },
+  // lang: app + question language ('en' | 'ms'); mandarin: 'off' | 'mastered' | 'all' (see lang.js)
+  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, lang: 'en', mandarin: 'mastered' },
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
 });
 

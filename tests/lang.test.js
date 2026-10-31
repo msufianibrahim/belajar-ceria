@@ -22,7 +22,7 @@ test('Mandarin on all levels', () => {
 });
 
 test('BM as the base language', () => {
-  const s = fromJson({ ...mastered, settings: { mathLang: 'ms', langV: 1 } });
+  const s = fromJson({ ...mastered, settings: { lang: 'ms' } });
   assert.equal(questionLang(s, 'other'), 'ms');
   assert.equal(questionLang(s, 'lv'), 'zh');
 });
@@ -38,9 +38,14 @@ test('pinyin numbers go up to 20', () => {
   assert.equal(py(20), 'èrshí');
 });
 
-test('old saves switch Math to English once, then keep the parent choice', () => {
+test('old saves switch to English once, then keep the parent choice', () => {
   const old = fromJson({ settings: { mathLang: 'ms' } });
-  assert.equal(old.settings.mathLang, 'en');
-  old.settings.mathLang = 'ms';
-  assert.equal(fromJson(JSON.parse(JSON.stringify(old))).settings.mathLang, 'ms');
+  assert.equal(old.settings.lang, 'en');
+  assert.ok(!('mathLang' in old.settings));
+  old.settings.lang = 'ms';
+  assert.equal(fromJson(JSON.parse(JSON.stringify(old))).settings.lang, 'ms');
+});
+
+test('a BM choice made after the English switch is kept when renaming to lang', () => {
+  assert.equal(fromJson({ settings: { mathLang: 'ms', langV: 1 } }).settings.lang, 'ms');
 });
