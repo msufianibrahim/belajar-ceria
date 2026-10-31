@@ -15,22 +15,10 @@ const THINGS = [
   { e: '🐥', n: 'anak ayam', en: 'chick', pl: 'chicks', zh: '小鸡', py: 'xiǎojī', mw: '只', mwpy: 'zhī' },
 ];
 
-// `goneFrom`: items at this index and after are shown crossed out (for subtraction).
-const group = (it, n, goneFrom = n) =>
-  `<div class="items">${Array.from({ length: n }, (_, k) =>
-    `<span class="${k >= goneFrom ? 'gone' : ''}">${it.e}</span>`).join('')}</div>`;
+const group = (it, n) => `<div class="items">${Array.from({ length: n }, () => `<span>${it.e}</span>`).join('')}</div>`;
 
-// Ten frame: `total` cells in rows of 5; the first `a` dots in one colour, the next `b` in another.
-// Lets a child *see* "7 is 5 and 2 more" without counting one by one.
-const frame = (total, a, b = 0) =>
-  `<div class="frame">${Array.from({ length: total }, (_, k) => {
-    const dot = k < a ? '<i class="dot a"></i>' : k < a + b ? '<i class="dot b"></i>' : '';
-    return `<span class="cell">${dot}</span>`;
-  }).join('')}</div>`;
-
-// "x + y" with small two-colour dots underneath to count.
-const pairLabel = (x, y) =>
-  `<span class="pair"><b>${x} + ${y}</b><span class="mini">${'<i class="a"></i>'.repeat(x)}${'<i class="b"></i>'.repeat(y)}</span></span>`;
+// Sums are shown as numbers only: pictures to count would let him count instead of add.
+const pairLabel = (x, y) => `<span class="pair"><b>${x} + ${y}</b></span>`;
 
 const blankable = (v) => (v === '?' ? '<span class="blank">?</span>' : `<span>${v}</span>`);
 
@@ -74,7 +62,6 @@ function compare(max) {
 function add(max) {
   const a = rand(1, max - 1);
   const b = rand(1, max - a);
-  const it = pick(THINGS);
   return {
     key: `a${a}+${b}`,
     prompt: {
@@ -84,7 +71,6 @@ function add(max) {
       py: `${py(a)} jiā ${py(b)} děngyú jǐ?`,
     },
     text: `${a} + ${b} = ?`,
-    visual: `<div class="sum">${group(it, a)}<b>+</b>${group(it, b)}</div>`,
     choices: numberChoices(a + b, 2, max),
     answer: a + b,
   };
@@ -100,12 +86,10 @@ const subPrompt = (a, b) => ({
 function subtract(max) {
   const a = rand(2, max);
   const b = rand(1, a - 1);
-  const it = pick(THINGS);
   return {
     key: `s${a}-${b}`,
     prompt: subPrompt(a, b),
     text: `${a} − ${b} = ?`,
-    visual: group(it, a, a - b),
     choices: numberChoices(a - b, 1, max - 1),
     answer: a - b,
   };
@@ -180,18 +164,17 @@ function bond(total) {
       py: `nǎge hé ${py(a)} jiā ${py(b)} yíyàng?`,
     },
     text: `${a} + ${b}`,
-    visual: frame(total, a, b),
     wide: true,
     choices,
     answer,
   };
 }
 
-// Two ten frames with `n` dots; the last `gone` of them crossed out (taken away).
-const tens = (n, gone = 0) =>
+// Two ten frames with `n` dots.
+const tens = (n) =>
   `<div class="frames">${[0, 10].map((start) => `<div class="frame">${Array.from({ length: 10 }, (_, j) => {
     const k = start + j;
-    return `<span class="cell">${k < n ? `<i class="dot${k >= n - gone ? ' gone' : ''}"></i>` : ''}</span>`;
+    return `<span class="cell">${k < n ? '<i class="dot"></i>' : ''}</span>`;
   }).join('')}</div>`).join('')}</div>`;
 
 // Count back: "9, 8, 7, ?" — the step before subtraction.
@@ -250,7 +233,6 @@ function subtractTeen() {
     key: `s${a}-${b}`,
     prompt: subPrompt(a, b),
     text: `${a} − ${b} = ?`,
-    visual: tens(a, b),
     choices: numberChoices(a - b, 1, 20),
     answer: a - b,
   };

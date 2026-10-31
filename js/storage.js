@@ -13,7 +13,7 @@ const defaults = () => ({
   frontier: {},                 // subjectId -> furthest open level id (see progress.js)
   placed: {},                   // subjectId -> true once placement is done
   // mathLang: base question language; mandarin: 'off' | 'mastered' | 'all' (see lang.js)
-  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, mathLang: 'ms', mandarin: 'mastered' },
+  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, mathLang: 'en', mandarin: 'mastered' },
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
 });
 

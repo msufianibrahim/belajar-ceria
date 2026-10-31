@@ -104,12 +104,10 @@ for (const [id, total] of [['math-bond5', 5], ['math-bond10', 10]]) {
     });
   });
 
-  test(`${id}: ten frame has ${total} cells, two colours matching the pair`, () => {
+  test(`${id}: numbers only, nothing to count`, () => {
     many(id, (q) => {
-      const [a, b] = pair(q.key.split('-')[1]);
-      assert.equal(count(q.visual, /class="cell"/g), total);
-      assert.equal(count(q.visual, /class="dot a"/g), a);
-      assert.equal(count(q.visual, /class="dot b"/g), b);
+      assert.ok(!q.visual);
+      for (const c of q.choices) assert.doesNotMatch(c.label, /<i/);
     });
   });
 }
@@ -182,10 +180,11 @@ for (const [id, max] of [['math-sub10', 10], ['math-sub20', 20]]) {
   });
 }
 
-test('subtract within 20: dots for the first number, the taken-away ones crossed out', () => {
-  many('math-sub20', (q) => {
-    const [, a, b] = q.text.match(/^(\d+) − (\d+) = \?$/).map(Number);
-    assert.equal(count(q.visual, /class="dot( gone)?"/g), a);
-    assert.equal(count(q.visual, /class="dot gone"/g), b);
-  });
+test('adding and taking away show the written sum only, no pictures to count', () => {
+  for (const id of ['math-add5', 'math-add10', 'math-sub5', 'math-sub10', 'math-sub20']) {
+    many(id, (q) => {
+      assert.ok(q.text);
+      assert.ok(!q.visual, id);
+    });
+  }
 });

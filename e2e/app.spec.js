@@ -163,14 +163,14 @@ test('parent gate rejects a wrong answer', async ({ page }) => {
 
 const levelButton = (page, title) => page.locator('.level', { hasText: title });
 
-test('number bonds: a pair with a ten frame, choices are other pairs, can be completed', async ({ page }) => {
+test('number bonds: a written pair, choices are other pairs, can be completed', async ({ page }) => {
   await open(page, { placed: { math: true }, frontier: { math: 'math-bond10' } });
   await page.getByRole('button', { name: /Matematik/ }).click();
   await levelButton(page, 'Pasangan 10').click();
 
   await expect(page.locator('.qtext')).toHaveText(/^\d \+ \d$/);
-  await expect(page.locator('.speak')).toContainText('Mana yang sama dengan');
-  await expect(page.locator('.frame .cell')).toHaveCount(10);
+  await expect(page.locator('.speak')).toContainText('Which is the same as');
+  await expect(page.locator('.visual')).toHaveCount(0);
   await expect(page.locator('.choice .pair')).toHaveCount(3);
   for (let i = 0; i < 5; i++) await answerRight(page);
   await expect(page.locator('.results h1')).toContainText('Hebat! Semua betul!');
@@ -211,37 +211,36 @@ test('Mandarin on mastered levels: characters, pinyin, English subtitle', async 
   await expect(page.locator('.speak .sub')).toContainText('How many');
 });
 
-test('new levels stay in BM by default', async ({ page }) => {
+test('new levels are in English by default', async ({ page }) => {
   await open(page, masteredCount5);
   await page.getByRole('button', { name: /Matematik/ }).click();
   await levelButton(page, 'Kenal nombor').click();
   await expect(page.locator('.speak .zh')).toHaveCount(0);
-  await expect(page.locator('.speak')).toContainText('Mana ada');
+  await expect(page.locator('.speak')).toContainText('Which group has');
 });
 
-test('parent can turn Mandarin off and switch the base language to English', async ({ page }) => {
+test('parent can turn Mandarin off and switch the base language to BM', async ({ page }) => {
   await open(page, masteredCount5);
   await page.getByRole('button', { name: 'Ibu bapa' }).click();
   const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
   await page.locator('.gate input').fill(String(a * b));
   await page.getByRole('button', { name: 'Masuk' }).click();
   await page.locator('select[data-setting="mandarin"]').selectOption('off');
-  await page.locator('select[data-setting="mathLang"]').selectOption('en');
+  await page.locator('select[data-setting="mathLang"]').selectOption('ms');
   await page.getByRole('button', { name: 'Kembali' }).click();
 
   await page.getByRole('button', { name: /Matematik/ }).click();
   await levelButton(page, 'Kira 1–5').click();
   await expect(page.locator('.speak .zh')).toHaveCount(0);
-  await expect(page.locator('.speak')).toContainText('How many');
+  await expect(page.locator('.speak')).toContainText('Berapa banyak');
 });
 
-test('subtraction within 20: written sum, crossed-out dots, can be completed', async ({ page }) => {
+test('subtraction within 20: written sum only, can be completed', async ({ page }) => {
   await open(page, { placed: { math: true }, frontier: { math: 'math-sub20' } });
   await page.getByRole('button', { name: /Matematik/ }).click();
   await levelButton(page, 'Tolak hingga 20').click();
   await expect(page.locator('.qtext')).toHaveText(/^1\d|20 − \d = \?$/);
-  await expect(page.locator('.frames .frame')).toHaveCount(2);
-  await expect(page.locator('.dot.gone').first()).toBeVisible();
+  await expect(page.locator('.visual')).toHaveCount(0);
   for (let i = 0; i < 5; i++) await answerRight(page);
   await expect(page.locator('.results h1')).toContainText('Hebat! Semua betul!');
 });

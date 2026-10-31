@@ -16,6 +16,11 @@ export function migrate(state) {
     }
     delete state.unlocked;
   }
+  // v1: Math questions default to English (he learns Math in English at school).
+  if (state.settings && !state.settings.langV) {
+    state.settings.mathLang = 'en';
+    state.settings.langV = 1;
+  }
   return state;
 }
 

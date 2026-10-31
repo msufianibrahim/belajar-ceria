@@ -5,15 +5,15 @@ import { fromJson } from '../js/storage.js';
 
 const mastered = { levels: { lv: { best: 5, cleared: true, perfectDays: ['a', 'b', 'c'], mastered: true } } };
 
-test('by default, new levels use BM and mastered levels use Mandarin', () => {
+test('by default, new levels use English and mastered levels use Mandarin', () => {
   const s = fromJson(mastered);
-  assert.equal(questionLang(s, 'other'), 'ms');
+  assert.equal(questionLang(s, 'other'), 'en');
   assert.equal(questionLang(s, 'lv'), 'zh');
 });
 
 test('Mandarin off: mastered levels use the base language', () => {
   const s = fromJson({ ...mastered, settings: { mandarin: 'off' } });
-  assert.equal(questionLang(s, 'lv'), 'ms');
+  assert.equal(questionLang(s, 'lv'), 'en');
 });
 
 test('Mandarin on all levels', () => {
@@ -21,9 +21,9 @@ test('Mandarin on all levels', () => {
   assert.equal(questionLang(s, 'other'), 'zh');
 });
 
-test('English as the base language', () => {
-  const s = fromJson({ ...mastered, settings: { mathLang: 'en' } });
-  assert.equal(questionLang(s, 'other'), 'en');
+test('BM as the base language', () => {
+  const s = fromJson({ ...mastered, settings: { mathLang: 'ms', langV: 1 } });
+  assert.equal(questionLang(s, 'other'), 'ms');
   assert.equal(questionLang(s, 'lv'), 'zh');
 });
 
@@ -36,4 +36,11 @@ test('pinyin numbers go up to 20', () => {
   assert.equal(py(10), 'shí');
   assert.equal(py(13), 'shísān');
   assert.equal(py(20), 'èrshí');
+});
+
+test('old saves switch Math to English once, then keep the parent choice', () => {
+  const old = fromJson({ settings: { mathLang: 'ms' } });
+  assert.equal(old.settings.mathLang, 'en');
+  old.settings.mathLang = 'ms';
+  assert.equal(fromJson(JSON.parse(JSON.stringify(old))).settings.mathLang, 'ms');
 });
