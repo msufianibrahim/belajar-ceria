@@ -31,6 +31,12 @@
 
   <div class="bar">
     <label>Suara: <select id="voice"></select></label>
+    <label>Cara huruf tunggal: <select id="mode">
+      <option value="plain">Biasa</option>
+      <option value="tatweel">Tatweel (ـ)</option>
+      <option value="zwj">Penyambung halimunan</option>
+      <option value="twice">Sebut 2 kali</option>
+    </select></label>
     <label>Laju: <input id="rate" type="range" min="0.4" max="1.1" step="0.1" value="0.7"> <span id="rateVal">0.7</span></label>
   </div>
   <p id="noVoice" class="muted" hidden>Pelayar tidak menyenaraikan suara Arab, jadi suara Arab lalai tablet akan digunakan. Kalau tiada bunyi langsung, pasang suara Arab dalam tetapan Text-to-speech tablet.</p>
@@ -90,9 +96,21 @@
       renderOut();
     }
 
+    // A lone letter can be read as an abbreviation (e.g. ص -> صلى الله عليه وسلم).
+    // These variants make it look like part of a word, so the voice reads the syllable.
+    const isSingle = (t) => [...t.replace(/[\u064B-\u0657\u0670]/g, '')].length === 1;
+    function variant(text) {
+      if (!isSingle(text)) return text;
+      const mode = document.getElementById('mode').value;
+      if (mode === 'tatweel') return text + '\u0640';
+      if (mode === 'zwj') return text + '\u200D';
+      if (mode === 'twice') return `${text} ${text}`;
+      return text;
+    }
+
     function speak(text) {
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
+      const u = new SpeechSynthesisUtterance(variant(text));
       const v = voices[document.getElementById('voice').value];
       if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'ar-SA'; }
       u.rate = Number(document.getElementById('rate').value);
@@ -115,7 +133,7 @@
 
     function renderOut() {
       const v = voices[document.getElementById('voice').value];
-      const lines = [`Suara: ${v ? `${v.name} (${v.lang})` : 'lalai tablet (ar-SA)'}`, `Pelayar: ${navigator.userAgent}`, `Laju: ${document.getElementById('rate').value}`];
+      const lines = [`Suara: ${v ? `${v.name} (${v.lang})` : 'lalai tablet (ar-SA)'}`, `Pelayar: ${navigator.userAgent}`, `Laju: ${document.getElementById('rate').value}`, `Cara huruf tunggal: ${document.getElementById('mode').value}`];
       for (const s of SECTIONS) {
         const bad = s.items.filter((_, i) => marks[`${s.id}-${i}`] === 'bad');
         const done = s.items.filter((_, i) => marks[`${s.id}-${i}`]).length;
@@ -139,6 +157,7 @@
       renderOut();
     });
     document.getElementById('voice').addEventListener('change', renderOut);
+    document.getElementById('mode').addEventListener('change', renderOut);
 
     render();
     fillVoices();
