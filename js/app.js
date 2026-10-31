@@ -556,5 +556,10 @@ if (new URLSearchParams(location.search).has('test')) {
 // Offline support. Skipped on localhost so edits show up immediately while developing.
 const isLocal = ['localhost', '127.0.0.1'].includes(location.hostname);
 if ('serviceWorker' in navigator && window.isSecureContext && !isLocal) {
-  navigator.serviceWorker.register('sw.js');
+  // When a new version takes over, reload once so he sees it without closing the app.
+  const hadOld = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadOld) location.reload(); });
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update(); });
+  });
 }
