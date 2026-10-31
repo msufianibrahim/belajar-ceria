@@ -50,8 +50,8 @@ test('home: Math is open, other subjects are coming soon', async ({ page }) => {
 test('placement: a child who gets everything right starts at the top level', async ({ page }) => {
   await open(page);
   await page.getByRole('button', { name: /Maths/ }).click();
-  for (let i = 0; i < 18; i++) await answerRight(page); // 9 main levels × 2 questions
-  await expect(page.locator('.level:not(.locked)')).toHaveCount(16);
+  for (let i = 0; i < 20; i++) await answerRight(page); // 10 main levels × 2 questions
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(17);
 });
 
 test('placement: a child who misses early starts at level 1, with no "wrong" shown', async ({ page }) => {
@@ -306,4 +306,30 @@ test('number pad: a wrong answer clears the box and he can try again', async ({ 
   await expect(page.locator('.typed')).toHaveText('?');
   await typeAnswer(page, right);
   await expect(page.locator('.dots .done')).toHaveCount(1);
+});
+
+test('parent can open levels up to a chosen one', async ({ page }) => {
+  await open(page, placed);
+  await page.getByRole('button', { name: 'Parents' }).click();
+  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
+  await page.locator('.gate input').fill(String(a * b));
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.locator('select[data-unlock="math"]').selectOption({ label: '15. Add within 20' });
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await expect(levelButton(page, 'Add within 10')).toBeEnabled();
+  await expect(levelButton(page, 'Add within 20')).toBeEnabled();
+  await expect(levelButton(page, 'Subtract within 20')).toBeDisabled();
+});
+
+test('passing Add within 5 opens Add within 10 straight away', async ({ page }) => {
+  await open(page, { placed: { math: true }, frontier: { math: 'math-add5' } });
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await expect(levelButton(page, 'Add within 10')).toBeDisabled();
+  await levelButton(page, 'Add within 5').click();
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await page.getByRole('button', { name: /Next/ }).click();
+  await expect(levelButton(page, 'Add within 10')).toBeEnabled();
+  await expect(levelButton(page, 'Pairs of 10')).toBeDisabled();
 });

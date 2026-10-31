@@ -2,7 +2,7 @@ import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
 import { settleRound, MASTERY_DAYS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
-import { topIndex, openUpTo, pickReview, answerMode } from './progress.js';
+import { topIndex, isOpen, openUpTo, pickReview, answerMode } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
@@ -114,10 +114,9 @@ function homeScreen() {
 
 function subjectScreen() {
   const s = subjectById(view.subjectId);
-  const top = topIndex(state, s);
   const items = s.levels.map((l, i) => {
     const r = state.levels[l.id];
-    const locked = i > top;
+    const locked = !isOpen(state, s, i);
     const badge = locked ? '🔒' : r?.mastered ? '👑' : i + 1;
     const zh = !locked && questionLang(state, l.id) === 'zh' ? '<span class="tag">华文</span>' : '';
     const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS}</span>` : '';
@@ -248,6 +247,8 @@ function parentScreen() {
     `<option value="${v}" ${state.settings[key] === v ? 'selected' : ''}>${v} ${tr('min', 'minit')}</option>`).join('')}</select>`;
   const progress = SUBJECTS.filter((sub) => sub.levels.length).map((sub) => `
     <h4>${sub.icon} ${N(sub.name)}</h4>
+    <label>${tr('Open levels up to', 'Buka tahap hingga')} <select data-unlock="${sub.id}">${sub.levels.map((l, i) =>
+      `<option value="${i}" ${i === topIndex(state, sub) ? 'selected' : ''}>${i + 1}. ${N(l.title)}</option>`).join('')}</select></label>
     <table>${sub.levels.map((l) => {
       const r = state.levels[l.id];
       const mastery = r?.mastered ? tr('👑 Mastered', '👑 Mahir') : r ? `${tr('Mastery', 'Mahir')} ${r.perfectDays.length}/${MASTERY_DAYS}` : '';
@@ -538,6 +539,13 @@ app.addEventListener('change', (e) => {
     state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : t.dataset.kind === 'text' ? t.value : Number(t.value);
     persist();
     if (t.dataset.setting === 'lang') render();
+  } else if (t.dataset.unlock) {
+    // Parent override: open levels he already knows (never locks levels again).
+    const sub = subjectById(t.dataset.unlock);
+    openUpTo(state, sub, Number(t.value));
+    state.placed[sub.id] = true;
+    persist();
+    render();
   } else if (t.id === 'child-name') {
     state.childName = t.value.trim().slice(0, 20);
     persist();

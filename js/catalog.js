@@ -1,7 +1,7 @@
 import { SUBJECTS } from './subjects/index.js';
 
 // Avatar shop. Prices are tuned so one subject can't buy everything:
-// Math alone pays roughly 480 coins in total; the shop costs 580.
+// Math alone pays roughly 510 coins in total; the shop costs 580.
 export const SHOP = [
   { id: 'c-yellow', cat: 'color', label: { en: 'Yellow', ms: 'Kuning' }, value: '#ffd54d', price: 0 },
   { id: 'c-blue', cat: 'color', label: { en: 'Blue', ms: 'Biru' }, value: '#7cc6fe', price: 15 },

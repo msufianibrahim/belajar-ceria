@@ -30,6 +30,14 @@ export function topIndex(state, subject) {
   return Math.max(0, subject.levels.findIndex((l) => l.id === state.frontier[subject.id]));
 }
 
+// A level is open if it's within the frontier, or if the level it `needs` (the previous
+// step of the same skill, e.g. Add within 5 -> Add within 10) is passed. So side levels
+// like number pairs don't block the main add/subtract path.
+export function isOpen(state, subject, i) {
+  const needs = subject.levels[i].needs;
+  return i <= topIndex(state, subject) || Boolean(needs && state.levels[needs]?.cleared);
+}
+
 // Open every level up to index i (never closes levels).
 export function openUpTo(state, subject, i) {
   const target = Math.min(i, subject.levels.length - 1);

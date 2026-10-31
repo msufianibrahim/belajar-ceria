@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate, topIndex, openUpTo, pickReview } from '../js/progress.js';
+import { migrate, topIndex, isOpen, openUpTo, pickReview } from '../js/progress.js';
 import { fromJson } from '../js/storage.js';
 import math from '../js/subjects/math.js';
 
@@ -93,5 +93,17 @@ test('answer mode: choices to learn, number pad once an add/subtract level is pa
 
 test('number pad is used on the addition and subtraction levels only', () => {
   assert.deepEqual(math.levels.filter((l) => l.typed).map((l) => l.id),
-    ['math-add5', 'math-sub5', 'math-add10', 'math-sub10', 'math-sub20']);
+    ['math-add5', 'math-sub5', 'math-add10', 'math-sub10', 'math-add20', 'math-sub20']);
+});
+
+test('passing an add/subtract level opens the next one of the same skill, even past side levels', () => {
+  const idx = (id) => math.levels.findIndex((l) => l.id === id);
+  const passed = { best: 4, cleared: true, perfectDays: [], mastered: false };
+  const s = fromJson({ frontier: { math: 'math-add5' }, levels: { 'math-add5': passed } });
+  assert.ok(isOpen(s, math, idx('math-add10')));
+  assert.ok(isOpen(s, math, idx('math-sub5')));
+  assert.ok(!isOpen(s, math, idx('math-add20')));
+  assert.ok(!isOpen(s, math, idx('math-bond10')));
+  s.levels['math-add10'] = passed;
+  assert.ok(isOpen(s, math, idx('math-add20')));
 });
