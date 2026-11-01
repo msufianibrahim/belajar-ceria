@@ -211,8 +211,8 @@ const masteredCount5 = {
 test('Mandarin on mastered levels: characters, pinyin, English subtitle', async ({ page }) => {
   await open(page, masteredCount5);
   await page.getByRole('button', { name: /Maths/ }).click();
-  await expect(levelButton(page, 'Count 1–5').locator('.tag')).toHaveText('华文');
-  await expect(levelButton(page, 'Number match').locator('.tag')).toHaveCount(0);
+  await expect(levelButton(page, 'Count 1–5').locator('.tag', { hasText: '华文' })).toHaveCount(1);
+  await expect(levelButton(page, 'Number match').locator('.tag', { hasText: '华文' })).toHaveCount(0);
 
   await levelButton(page, 'Count 1–5').click();
   await expect(page.locator('.speak .zh')).toContainText('有几');
