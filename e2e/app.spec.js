@@ -51,7 +51,7 @@ test('placement: a child who gets everything right starts at the top level', asy
   await open(page);
   await page.getByRole('button', { name: /Maths/ }).click();
   for (let i = 0; i < 20; i++) await answerRight(page); // 10 main levels × 2 questions
-  await expect(page.locator('.level:not(.locked)')).toHaveCount(17);
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(18);
 });
 
 test('placement: a child who misses early starts at level 1, with no "wrong" shown', async ({ page }) => {
@@ -323,7 +323,7 @@ test('parent can open levels up to a chosen one', async ({ page }) => {
   const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
   await page.locator('.gate input').fill(String(a * b));
   await page.getByRole('button', { name: 'Enter' }).click();
-  await page.locator('select[data-unlock="math"]').selectOption({ label: '15. Add within 20' });
+  await page.locator('select[data-unlock="math"]').selectOption({ label: '16. Add within 20' });
   await page.getByRole('button', { name: 'Back', exact: true }).click();
 
   await page.getByRole('button', { name: /Maths/ }).click();

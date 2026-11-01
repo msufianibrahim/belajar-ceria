@@ -45,7 +45,7 @@ test('the learning path is in the agreed order', () => {
   assert.deepEqual(math.levels.map((l) => l.id), [
     'math-count5', 'math-numerals', 'math-count10', 'math-compare', 'math-sequence',
     'math-countback10', 'math-bond5', 'math-add5', 'math-less', 'math-sub5',
-    'math-bond10', 'math-add10', 'math-sub10', 'math-count20', 'math-add20', 'math-countback20', 'math-sub20',
+    'math-bond10', 'math-add10', 'math-sub10', 'math-add9', 'math-count20', 'math-add20', 'math-countback20', 'math-sub20',
   ]);
 });
 
@@ -180,6 +180,17 @@ for (const [id, max] of [['math-sub10', 10], ['math-sub20', 20]]) {
   });
 }
 
+test('add up to 9 + 9: single digits, mostly across ten', () => {
+  let cross = 0;
+  many('math-add9', (q) => {
+    const [, a, b] = q.text.match(/^(\d) \+ (\d) = \?$/).map(Number);
+    assert.ok(a >= 1 && b >= 1);
+    assert.equal(q.answer, a + b);
+    if (q.answer > 10) cross++;
+  });
+  assert.ok(cross > 250, `${cross}/500 across ten`);
+});
+
 test('add within 20: answers 11–20, both parts at least 1', () => {
   many('math-add20', (q) => {
     const [, a, b] = q.text.match(/^(\d+) \+ (\d+) = \?$/).map(Number);
@@ -190,7 +201,7 @@ test('add within 20: answers 11–20, both parts at least 1', () => {
 });
 
 test('adding and taking away show the written sum only, no pictures to count', () => {
-  for (const id of ['math-add5', 'math-add10', 'math-add20', 'math-sub5', 'math-sub10', 'math-sub20']) {
+  for (const id of ['math-add5', 'math-add10', 'math-add9', 'math-add20', 'math-sub5', 'math-sub10', 'math-sub20']) {
     many(id, (q) => {
       assert.ok(q.text);
       assert.ok(!q.visual, id);

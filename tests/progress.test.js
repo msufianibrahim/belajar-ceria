@@ -93,7 +93,7 @@ test('answer mode: choices to learn, number pad once an add/subtract level is pa
 
 test('number pad is used on the addition and subtraction levels only', () => {
   assert.deepEqual(math.levels.filter((l) => l.typed).map((l) => l.id),
-    ['math-add5', 'math-sub5', 'math-add10', 'math-sub10', 'math-add20', 'math-sub20']);
+    ['math-add5', 'math-sub5', 'math-add10', 'math-sub10', 'math-add9', 'math-add20', 'math-sub20']);
 });
 
 test('passing an add/subtract level opens the next one of the same skill, even past side levels', () => {
@@ -104,7 +104,9 @@ test('passing an add/subtract level opens the next one of the same skill, even p
   assert.ok(isOpen(s, math, idx('math-sub5')));
   assert.ok(!isOpen(s, math, idx('math-add20')));
   assert.ok(!isOpen(s, math, idx('math-bond10')));
+  assert.ok(!isOpen(s, math, idx('math-add9')));
   s.levels['math-add10'] = passed;
+  assert.ok(isOpen(s, math, idx('math-add9')));
   assert.ok(isOpen(s, math, idx('math-add20')));
 });
 

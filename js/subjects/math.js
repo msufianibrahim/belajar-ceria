@@ -225,6 +225,25 @@ function countTeen() {
   };
 }
 
+// Single-digit facts up to 9 + 9; two in three cross ten (within 10 has its own level).
+function addDigits() {
+  const cross = Math.random() < 2 / 3;
+  const a = rand(cross ? 2 : 1, 9);
+  const b = cross ? rand(Math.max(1, 11 - a), 9) : rand(1, Math.min(9, 10 - a));
+  return {
+    key: `a${a}+${b}`,
+    prompt: {
+      ms: `${a} tambah ${b}, jadi berapa?`,
+      en: `${a} plus ${b} makes how many?`,
+      zh: `${a}加${b}等于几？`,
+      py: `${py(a)} jiā ${py(b)} děngyú jǐ?`,
+    },
+    text: `${a} + ${b} = ?`,
+    choices: numberChoices(a + b, 2, 18),
+    answer: a + b,
+  };
+}
+
 // Addition within 20: answers 11–20, both "8 + 5" (across ten) and "12 + 5".
 function addTeen() {
   const a = rand(1, 19);
@@ -280,6 +299,7 @@ export default {
     { id: 'math-bond10', title: { en: 'Pairs of 10', ms: 'Pasangan 10' }, icon: '🔟', probe: false, sticker: { id: 'st-peacock', e: '🦚' }, gen: () => bond(10) },
     { id: 'math-add10', typed: true, needs: 'math-add5', title: { en: 'Add within 10', ms: 'Tambah hingga 10' }, icon: '➕', sticker: { id: 'st-butterfly', e: '🦋' }, gen: () => add(10) },
     { id: 'math-sub10', typed: true, needs: 'math-sub5', title: { en: 'Subtract within 10', ms: 'Tolak hingga 10' }, icon: '➖', sticker: { id: 'st-whale', e: '🐳' }, gen: () => subtract(10) },
+    { id: 'math-add9', typed: true, probe: false, needs: 'math-add10', title: { en: 'Add up to 9 + 9', ms: 'Tambah hingga 9 + 9' }, icon: '➕', sticker: { id: 'st-turtle', e: '🐢' }, gen: () => addDigits() },
     { id: 'math-count20', title: { en: 'Count 11–20', ms: 'Kira 11–20' }, icon: '🧮', sticker: { id: 'st-flamingo', e: '🦩' }, gen: () => countTeen() },
     { id: 'math-add20', typed: true, needs: 'math-add10', title: { en: 'Add within 20', ms: 'Tambah hingga 20' }, icon: '➕', sticker: { id: 'st-crocodile', e: '🐊' }, gen: () => addTeen() },
     { id: 'math-countback20', title: { en: 'Count back from 20', ms: 'Kira undur hingga 20' }, icon: '⬅️', probe: false, sticker: { id: 'st-kangaroo', e: '🦘' }, gen: () => countBack(12, 20) },
