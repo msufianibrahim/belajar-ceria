@@ -66,7 +66,7 @@ npm test
    * **iPad (Safari):** use Share → *Add to Home Screen*. Always launch it from that icon. iPadOS can clear data for sites that are only visited in Safari.
 4. The app works offline after the first load.
 
-**When you deploy changes:** bump `CACHE` in `sw.js` (for example `v1` → `v2`). Otherwise the tablet keeps the old version.
+**When you deploy changes:** nothing extra. `sw.js` is network-first, so the tablet gets the new version on its next load. Bump `CACHE` in `sw.js` only when the `FILES` list changes.
 
 **Voice:** prompts use the tablet's text-to-speech. For best results, install a Malay voice under the tablet's text-to-speech settings. If none is installed, the app falls back to an Indonesian voice.
 

@@ -1,6 +1,6 @@
-// Offline cache. Cache-first, so BUMP THIS VERSION every time you deploy changes,
-// otherwise the tablet keeps showing the old app.
-const CACHE = 'belajar-ceria-v14';
+// Offline cache. Network-first: online, the tablet always gets the latest files;
+// offline, it falls back to this cache. Bump CACHE when FILES changes.
+const CACHE = 'belajar-ceria-v15';
 
 const FILES = [
   './',
@@ -39,6 +39,17 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+  const req = e.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  e.respondWith(
+    fetch(req, { cache: 'no-cache' })
+      .then((res) => {
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => caches.match(req, { ignoreSearch: true }))
+  );
 });
