@@ -378,3 +378,14 @@ test('daily practice: card on home, 2 rounds pay once; medals show under the ava
   await page.getByRole('button', { name: /Next/ }).click();
   await expect(coins(page)).toHaveText('🪙 10');
 });
+
+test('parent sets daily practice to 3 rounds; the home card shows it', async ({ page }) => {
+  await open(page, { placed: { math: true }, settings: { practice: ['math-count5'] } });
+  await page.getByRole('button', { name: 'Parents' }).click();
+  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
+  await page.locator('.gate input').fill(String(a * b));
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.locator('select[data-practice-rounds]').selectOption('3');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.locator('.big-btn.practice')).toContainText('3 rounds = 🪙 15');
+});

@@ -10,8 +10,14 @@
 //   levels those rounds must be typed on the number pad (recall, not recognition).
 // - Rewards are predictable. No random drops.
 
-export const COINS = { firstClear: 10, newBest: 5, mastery: 15, practice: 10 };
-export const PRACTICE_ROUNDS = 2;          // daily practice: rounds per day for the coins
+export const COINS = { firstClear: 10, newBest: 5, mastery: 15, practice: 5 }; // practice: per round of the day's plan
+export const PRACTICE_CHOICES = [2, 3, 5];   // daily practice length the parent can pick (rounds a day)
+// Daily practice plan: rounds a day (parent setting) and the coins, paid once for finishing them.
+export function practicePlan(state) {
+  const n = state.settings?.practiceRounds;
+  const rounds = PRACTICE_CHOICES.includes(n) ? n : PRACTICE_CHOICES[0];
+  return { rounds, coins: rounds * COINS.practice };
+}
 export const MEDALS = ['🥉', '🥈', '🥇'];
 export const MEDAL_ROUNDS = [10, 20, 30];  // rounds on a level for each medal
 export const medalCount = (rounds = 0) => MEDAL_ROUNDS.filter((n) => rounds >= n).length;
@@ -45,12 +51,13 @@ export function settleRound(state, level, score, total, today, { typed = false }
     if (state.practiceDay?.date !== today) state.practiceDay = { date: today, rounds: 0, paid: false };
     const day = state.practiceDay;
     day.rounds++;
-    const paid = day.rounds >= PRACTICE_ROUNDS && !day.paid;
+    const plan = practicePlan(state);
+    const paid = day.rounds >= plan.rounds && !day.paid;
     if (paid) {
       day.paid = true;
-      res.coins += COINS.practice;
+      res.coins += plan.coins;
     }
-    res.practice = { done: Math.min(day.rounds, PRACTICE_ROUNDS), of: PRACTICE_ROUNDS, paid };
+    res.practice = { done: Math.min(day.rounds, plan.rounds), of: plan.rounds, paid, coins: plan.coins };
   }
 
   if (res.passed && !rec.cleared) {

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { settleRound, COINS, MASTERY_DAYS, medalCount } from '../js/rewards.js';
+import { settleRound, COINS, MASTERY_DAYS, medalCount, practicePlan } from '../js/rewards.js';
 
 const level = { id: 'lv', sticker: { id: 'st', e: '⭐' } };
 const fresh = () => ({ coins: 0, stickers: [], levels: {} });
@@ -82,11 +82,21 @@ test('daily practice: 2 rounds of a chosen topic pay a fixed bonus once a day, w
   settleRound(s, level, 5, 5, 'd1');                   // first clear (10)
   const r2 = settleRound(s, level, 2, 5, 'd1');
   assert.equal(r2.practice.paid, true);
-  assert.equal(r2.coins, COINS.practice);
+  assert.equal(r2.coins, 2 * COINS.practice);
   const r3 = settleRound(s, level, 2, 5, 'd1');
   assert.equal(r3.coins, 0, 'no more practice coins today');
   settleRound(s, level, 2, 5, 'd2');
-  assert.equal(settleRound(s, level, 2, 5, 'd2').coins, COINS.practice, 'again the next day');
+  assert.equal(settleRound(s, level, 2, 5, 'd2').coins, 2 * COINS.practice, 'again the next day');
+});
+
+test('daily practice length: parent picks 2, 3 or 5 rounds; coins scale and still pay once', () => {
+  const s = { ...fresh(), settings: { practice: [level.id], practiceRounds: 5 } };
+  for (let k = 1; k <= 4; k++) assert.equal(settleRound(s, level, 0, 10, 'd1').practice.paid, false, `round ${k}`);
+  const r5 = settleRound(s, level, 0, 10, 'd1');
+  assert.equal(r5.practice.paid, true);
+  assert.equal(r5.coins, 5 * COINS.practice);
+  assert.equal(settleRound(s, level, 10, 10, 'd1').practice.paid, false);
+  assert.equal(practicePlan({ settings: { practiceRounds: 99 } }).rounds, 2, 'unknown values fall back to 2');
 });
 
 test('rounds on a topic that is not daily practice never pay practice coins', () => {

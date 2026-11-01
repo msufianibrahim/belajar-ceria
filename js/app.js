@@ -1,6 +1,6 @@
 import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
-import { settleRound, ROUND, masteryMark, MASTERY_DAYS, MEDALS, MEDAL_ROUNDS, medalCount, PRACTICE_ROUNDS, COINS } from './rewards.js';
+import { settleRound, ROUND, masteryMark, MASTERY_DAYS, MEDALS, MEDAL_ROUNDS, medalCount, PRACTICE_CHOICES, practicePlan, COINS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
 import { topIndex, isOpen, openUpTo, pickReview, answerMode } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
@@ -125,17 +125,18 @@ function practiceToday() {
   const picks = (state.settings.practice ?? []).map(findLevel).filter(Boolean);
   if (!picks.length) return null;
   const day = state.practiceDay?.date === todayKey() ? state.practiceDay : { rounds: 0, paid: false };
-  return { picks, next: picks[day.rounds % picks.length], rounds: Math.min(day.rounds, PRACTICE_ROUNDS), paid: day.paid };
+  return { picks, next: picks[day.rounds % picks.length], rounds: Math.min(day.rounds, practicePlan(state).rounds), paid: day.paid };
 }
 
 function practiceCard() {
   const p = practiceToday();
   if (!p) return '';
-  const dots = Array.from({ length: PRACTICE_ROUNDS }, (_, k) => (k < p.rounds ? '●' : '○')).join('');
+  const plan = practicePlan(state);
+  const dots = Array.from({ length: plan.rounds }, (_, k) => (k < p.rounds ? '●' : '○')).join('');
   const topics = p.picks.map(({ subject, level }) => `${levelIcon(subject, level)} ${N(level.title)}`).join(' · ');
   return `<button class="big-btn practice ${p.paid ? 'done' : ''}" data-act="practice">
     🎯 ${tr("Today's practice", 'Latihan hari ini')}: ${topics}
-    <small>${p.paid ? tr('✓ Done today! Play more for medals', '✓ Siap hari ini! Main lagi untuk pingat') : `${dots} — ${tr(`${PRACTICE_ROUNDS} rounds`, `${PRACTICE_ROUNDS} pusingan`)} = 🪙 ${COINS.practice}`}</small>
+    <small>${p.paid ? tr('✓ Done today! Play more for medals', '✓ Siap hari ini! Main lagi untuk pingat') : `${dots} — ${tr(`${plan.rounds} rounds`, `${plan.rounds} pusingan`)} = 🪙 ${plan.coins}`}</small>
   </button>`;
 }
 
@@ -237,8 +238,10 @@ function resultsScreen() {
   const lines = [];
   if (res.coins) lines.push(`🪙 +${res.coins} ${tr('coins', 'syiling')}`);
   if (res.practice) lines.push(res.practice.paid
-    ? tr(`🎯 Today's practice done! (+${COINS.practice})`, `🎯 Latihan hari ini siap! (+${COINS.practice})`)
-    : res.practice.done < res.practice.of ? tr(`🎯 Practice ${res.practice.done}/${res.practice.of} — one more!`, `🎯 Latihan ${res.practice.done}/${res.practice.of} — satu lagi!`) : '');
+    ? tr(`🎯 Today's practice done! (+${res.practice.coins})`, `🎯 Latihan hari ini siap! (+${res.practice.coins})`)
+    : res.practice.done < res.practice.of ? (res.practice.of - res.practice.done === 1
+      ? tr(`🎯 Practice ${res.practice.done}/${res.practice.of} — one more!`, `🎯 Latihan ${res.practice.done}/${res.practice.of} — satu lagi!`)
+      : tr(`🎯 Practice ${res.practice.done}/${res.practice.of} — keep going!`, `🎯 Latihan ${res.practice.done}/${res.practice.of} — teruskan!`)) : '');
   if (res.medal) lines.push(tr(`${res.medal} New medal!`, `${res.medal} Pingat baru!`));
   else {
     const next = MEDAL_ROUNDS.find((n) => n > (state.levels[view.levelId]?.rounds ?? 0));
@@ -360,7 +363,9 @@ function parentScreen() {
       <p class="muted">${tr('👑 levels only: mastered levels ask in 华文 + pinyin + English subtitle, so only the language is new.', 'Tahap 👑 sahaja: soalan dalam 华文 + pinyin + sari kata English untuk tahap yang sudah mahir, supaya hanya bahasa yang baru.')}</p>
     </section>
     <section class="panel"><h3>${tr('Daily practice', 'Latihan harian')}</h3>
-      <p class="muted">${tr(`Topics to drill. ${PRACTICE_ROUNDS} rounds a day = 🪙 ${COINS.practice}, once a day.`, `Topik untuk diulang. ${PRACTICE_ROUNDS} pusingan sehari = 🪙 ${COINS.practice}, sekali sehari.`)}</p>
+      <p class="muted">${tr('Topics to drill. Coins once a day for finishing, whatever the score.', 'Topik untuk diulang. Syiling sekali sehari bila siap, walau apa pun markahnya.')}</p>
+      <label>${tr('Length', 'Panjang')} <select data-practice-rounds>${PRACTICE_CHOICES.map((n) =>
+        `<option value="${n}" ${practicePlan(state).rounds === n ? 'selected' : ''}>${tr(`${n} rounds (${n * ROUND} questions) = 🪙 ${n * COINS.practice}`, `${n} pusingan (${n * ROUND} soalan) = 🪙 ${n * COINS.practice}`)}</option>`).join('')}</select></label>
       ${[0, 1].map((k) => `<label>${tr('Topic', 'Topik')} ${k + 1} <select data-practice="${k}">
         <option value="">—</option>
         ${SUBJECTS.filter((sub) => sub.levels.length).map((sub) => `<optgroup label="${esc(L(state, sub.name))}">${sub.levels.map((l) =>
@@ -648,6 +653,10 @@ app.addEventListener('change', (e) => {
     state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : t.dataset.kind === 'text' ? t.value : Number(t.value);
     persist();
     if (t.dataset.setting === 'lang') render();
+  } else if (t.dataset.practiceRounds !== undefined) {
+    state.settings.practiceRounds = Number(t.value);
+    persist();
+    render();
   } else if (t.dataset.practice) {
     const picks = [...(state.settings.practice ?? [])];
     picks[Number(t.dataset.practice)] = t.value;
