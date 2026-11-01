@@ -4,7 +4,7 @@ import iqra from '../js/subjects/iqra.js';
 import { makeRound } from '../js/subjects/util.js';
 
 const level = (id) => iqra.levels.find((l) => l.id === id);
-const many = (fn) => { for (const l of iqra.levels) for (let n = 0; n < 300; n++) for (let pos = 0; pos < 5; pos++) fn(l.gen(pos), l, pos); };
+const many = (fn) => { for (const l of iqra.levels) for (let n = 0; n < 300; n++) for (let pos = 0; pos < 10; pos++) fn(l.gen(pos), l, pos); };
 const F = 'َ', K = 'ِ', D = 'ُ';
 // Letters that carry a sound (the ya/wau of a long vowel only stretches it).
 const letters = (s) => [...s.replace(/[\u064A\u0648\u0649]\u0652/g, '').replace(/[\u064B-\u0670 ]/g, '')].length;
@@ -28,8 +28,8 @@ test('wrong choices are the same word with one mark changed', () => {
 test('words get longer through the round: 2-3 letters, then 3-4, then 6-8', () => {
   many((q, l, pos) => {
     const n = letters(q.answer);
-    if (pos < 2) assert.ok(n >= 2 && n <= 3, `${l.id} pos ${pos}: ${q.answer}`);
-    else if (pos < 4) assert.ok(n >= 3 && n <= 4, `${l.id} pos ${pos}: ${q.answer}`);
+    if (pos < 3) assert.ok(n >= 2 && n <= 3, `${l.id} pos ${pos}: ${q.answer}`);
+    else if (pos < 7) assert.ok(n >= 3 && n <= 4, `${l.id} pos ${pos}: ${q.answer}`);
     else assert.ok(n >= 6 && n <= 8, `${l.id} pos ${pos}: ${q.answer}`);
   });
 });
@@ -60,8 +60,8 @@ test('each level only uses marks learnt so far, and always has its new one', () 
   });
 });
 
-test('a round has 5 different questions', () => {
-  for (const l of iqra.levels) assert.equal(new Set(makeRound(l.gen, 5).map((q) => q.key)).size, 5, l.id);
+test('a round has 10 different questions', () => {
+  for (const l of iqra.levels) assert.equal(new Set(makeRound(l.gen, 10).map((q) => q.key)).size, 10, l.id);
 });
 
 test('starts open up to the level he is on', () => {

@@ -106,3 +106,13 @@ test('medals at 10, 20, 30 finished rounds, any score, no coins', () => {
   assert.deepEqual(medals, [[10, '🥉'], [20, '🥈'], [30, '🥇']]);
   assert.equal(medalCount(s.levels[level.id].rounds), 3);
 });
+
+test('10-question rounds: pass at 8, 9 or 10 counts toward mastery', () => {
+  const s = fresh();
+  assert.equal(settleRound(s, level, 7, 10, 'd1').passed, false);
+  assert.equal(settleRound(s, level, 8, 10, 'd1').passed, true);
+  assert.equal(settleRound(s, level, 8, 10, 'd1').masteryProgress, 0);
+  assert.equal(settleRound(s, level, 9, 10, 'd1').masteryProgress, 1);
+  settleRound(s, level, 10, 10, 'd2');
+  assert.equal(settleRound(s, level, 9, 10, 'd3').justMastered, true);
+});

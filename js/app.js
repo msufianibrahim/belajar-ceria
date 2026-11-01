@@ -1,6 +1,6 @@
 import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
-import { settleRound, MASTERY_DAYS, MEDALS, MEDAL_ROUNDS, medalCount, PRACTICE_ROUNDS, COINS } from './rewards.js';
+import { settleRound, ROUND, masteryMark, MASTERY_DAYS, MEDALS, MEDAL_ROUNDS, medalCount, PRACTICE_ROUNDS, COINS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
 import { topIndex, isOpen, openUpTo, pickReview, answerMode } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
@@ -9,7 +9,6 @@ import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
 import { avatarSvg } from './avatar.js';
 import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
 
-const ROUND = 5;                // questions per round
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
 // Screens where the play clock runs and the rest gate applies.
 const KID_SCREENS = new Set(['home', 'subject', 'play', 'placement', 'results', 'stickers', 'shop']);
@@ -140,7 +139,11 @@ function practiceCard() {
   </button>`;
 }
 
-const stars = (n, total) => '★'.repeat(n) + '☆'.repeat(Math.max(0, total - n));
+// Always 5 stars, so a 10-question round shows 9/10 as ★★★★☆.
+const stars = (n, total) => {
+  const k = Math.floor((n * 5) / total);
+  return '★'.repeat(k) + '☆'.repeat(5 - k);
+};
 
 // ---------------------------------------------------------------- screens
 
@@ -221,10 +224,10 @@ function masteryGoal(res, levelId) {
   if (!r || r.mastered) return '';
   const crowns = Array.from({ length: MASTERY_DAYS }, (_, k) => `<span class="${k < r.perfectDays.length ? 'got' : ''}">👑</span>`).join('');
   const msg = res.masteryProgress
-    ? tr(`${res.masteryProgress}/${MASTERY_DAYS} — get 5/5 again on another day!`, `${res.masteryProgress}/${MASTERY_DAYS} — dapat 5/5 lagi pada hari lain!`)
+    ? tr(`${res.masteryProgress}/${MASTERY_DAYS} — get ${masteryMark(ROUND)}/${ROUND} again on another day!`, `${res.masteryProgress}/${MASTERY_DAYS} — dapat ${masteryMark(ROUND)}/${ROUND} lagi pada hari lain!`)
     : r.perfectDays.includes(todayKey())
       ? tr('Already counted today — come back tomorrow!', 'Sudah dikira hari ini — datang lagi esok!')
-      : tr('Get 5/5 to earn a crown!', 'Dapat 5/5 untuk dapat mahkota!');
+      : tr(`Get ${masteryMark(ROUND)}/${ROUND} to earn a crown!`, `Dapat ${masteryMark(ROUND)}/${ROUND} untuk dapat mahkota!`);
   return `<div class="goal"><div class="crowns">${crowns}</div>
     <b>${tr(`${MASTERY_DAYS} crowns = 🪙 ${COINS.mastery}`, `${MASTERY_DAYS} mahkota = 🪙 ${COINS.mastery}`)}</b><small>${msg}</small></div>`;
 }

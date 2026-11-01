@@ -82,10 +82,10 @@ function addTarget(w, st) {
   return w;
 }
 
-// Round position -> length: 2 letters, then a 3-letter root, then two words (6-8 letters).
+// Round position (0-9) -> length: 2 letters, then a 3-letter root, then two words (6-8 letters).
 function makeWord(pos, st) {
   const root = pick(ROOTS);
-  const letters = pos < 2 ? root.slice(0, 2) : root;
+  const letters = pos < 3 ? root.slice(0, 2) : root;
   const w = letters.map((l) => syllable(l, st));
   // Once learnt, a long ii at the end of a word is sometimes written with the dotless ya.
   const last = w[w.length - 1];
@@ -103,7 +103,7 @@ function change(s, st) {
 }
 
 function question(pos, st) {
-  const words = pos >= 4 ? [makeWord(2, st), makeWord(2, st)] : [makeWord(pos, st)];
+  const words = pos >= 7 ? [makeWord(3, st), makeWord(3, st)] : [makeWord(pos, st)];
   const answer = shown(words);
   const flat = words.flat();
   // One wrong choice changes the new thing (when there is one), the other a different syllable.
@@ -117,7 +117,7 @@ function question(pos, st) {
     if (w !== answer) wrong.add(w);
   }
   const choices = shuffle([answer, ...wrong]).map((v) => ({ label: `<span class="ar">${v}</span>`, value: v }));
-  return { key: answer, prompt: PROMPT, sound: spoken(words), choices, answer, stack: pos >= 4 };
+  return { key: answer, prompt: PROMPT, sound: spoken(words), choices, answer, stack: pos >= 7 };
 }
 
 const isTarget = (s, st) => ({

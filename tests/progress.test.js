@@ -107,3 +107,9 @@ test('passing an add/subtract level opens the next one of the same skill, even p
   s.levels['math-add10'] = passed;
   assert.ok(isOpen(s, math, idx('math-add20')));
 });
+
+test('old 5-question best scores are doubled once for 10-question rounds', () => {
+  const s = fromJson({ levels: { a: { best: 4, cleared: true, perfectDays: [], mastered: false } } });
+  assert.equal(s.levels.a.best, 8);
+  assert.equal(fromJson(JSON.parse(JSON.stringify(s))).levels.a.best, 8);
+});

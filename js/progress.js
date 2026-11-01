@@ -16,6 +16,13 @@ export function migrate(state) {
     }
     delete state.unlocked;
   }
+  // Rounds went from 5 to 10 questions: scale old best scores so "beat your best" stays fair.
+  for (const rec of Object.values(state.levels ?? {})) {
+    if (!rec.of) {
+      rec.best = (rec.best ?? 0) * 2;
+      rec.of = 10;
+    }
+  }
   // `mathLang` became `lang`. Saves from before langV switch to English (he learns Maths in English).
   const st = state.settings;
   if (st && 'mathLang' in st) {

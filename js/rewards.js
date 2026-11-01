@@ -6,7 +6,7 @@
 // - Every finished round counts toward practice medals (🥉🥈🥇): effort, not score, no coins.
 // - Replaying an old level is always allowed and still counts toward mastery,
 //   but only earns coins if the child beats their previous best.
-// - Mastery = a perfect round on 3 *different days* (spaced practice). On add/subtract
+// - Mastery = a near-perfect round (9/10; 5/5 on short rounds) on 3 *different days* (spaced practice). On add/subtract
 //   levels those rounds must be typed on the number pad (recall, not recognition).
 // - Rewards are predictable. No random drops.
 
@@ -16,11 +16,13 @@ export const MEDALS = ['🥉', '🥈', '🥇'];
 export const MEDAL_ROUNDS = [10, 20, 30];  // rounds on a level for each medal
 export const medalCount = (rounds = 0) => MEDAL_ROUNDS.filter((n) => rounds >= n).length;
 export const MASTERY_DAYS = 3;
-export const passMark = (total) => Math.ceil(total * 0.8); // 4 of 5
+export const ROUND = 10;                                    // questions per round
+export const passMark = (total) => Math.ceil(total * 0.8); // 8 of 10
+export const masteryMark = (total) => total - Math.floor(total / 10); // 9 of 10: one slip allowed
 
 // `typed`: answered on the number pad. On typed levels only typed rounds count toward mastery.
 export function settleRound(state, level, score, total, today, { typed = false } = {}) {
-  const rec = (state.levels[level.id] ??= { best: 0, cleared: false, perfectDays: [], mastered: false });
+  const rec = (state.levels[level.id] ??= { best: 0, of: ROUND, cleared: false, perfectDays: [], mastered: false });
   const res = {
     score,
     total,
@@ -66,8 +68,9 @@ export function settleRound(state, level, score, total, today, { typed = false }
   rec.lastPlayed = today;
 
   const countsForMastery = !level.typed || typed;
-  if (score === total && !rec.mastered && !countsForMastery) res.needsTyping = true;
-  if (score === total && !rec.mastered && countsForMastery) {
+  const masteryRound = score >= masteryMark(total) && !rec.mastered;
+  if (masteryRound && !countsForMastery) res.needsTyping = true;
+  if (masteryRound && countsForMastery) {
     if (!rec.perfectDays.includes(today)) rec.perfectDays.push(today);
     res.masteryProgress = rec.perfectDays.length;
     if (rec.perfectDays.length >= MASTERY_DAYS) {
