@@ -73,7 +73,7 @@ test('perfect first round: coins, sticker, mastery progress, next level unlocked
   await expect(results.locator('h1')).toContainText('Amazing! All correct!');
   await expect(results).toContainText('+10 coins');
   await expect(results).toContainText('New sticker!');
-  await expect(results).toContainText('Mastery: 1/3');
+  await expect(results).toContainText('1/3 — get 5/5 again');
 
   await page.getByRole('button', { name: /Next/ }).click();
   await expect(page.locator('.level:not(.locked)')).toHaveCount(2);
@@ -268,8 +268,8 @@ test('mastery progress shows on passed levels; Review replays the oldest one', a
   await expect(page.locator('.line .here')).toBeVisible(); // a "Kurang 1, kurang 2" question
 
   await page.getByRole('button', { name: 'Back', exact: true }).click();
-  await expect(levelButton(page, 'Count 1–5').locator('.tag.gold')).toHaveText('👑 1/3');
-  await expect(levelButton(page, '1 less, 2 less').locator('.tag.gold')).toHaveText('👑 0/3');
+  await expect(levelButton(page, 'Count 1–5').locator('.tag.gold')).toHaveText('👑 1/3 → 🪙 15');
+  await expect(levelButton(page, '1 less, 2 less').locator('.tag.gold')).toHaveText('👑 0/3 → 🪙 15');
 });
 
 test('no Review button before any level is passed', async ({ page }) => {
@@ -290,7 +290,7 @@ test('before passing an add/subtract level: choices; a perfect round says to typ
   await expect(page.locator('.keypad')).toHaveCount(0);
   for (let i = 0; i < 5; i++) await answerRight(page);
   await expect(page.locator('.results')).toContainText('type the answer');
-  await expect(page.locator('.results')).not.toContainText('Mastery:');
+  await expect(page.locator('.results')).not.toContainText('get 5/5 again');
 });
 
 test('after passing: number pad, and a perfect typed round counts toward mastery', async ({ page }) => {
@@ -300,7 +300,7 @@ test('after passing: number pad, and a perfect typed round counts toward mastery
   await expect(page.locator('.keypad')).toBeVisible();
   await expect(choices(page)).toHaveCount(0);
   for (let i = 0; i < 5; i++) await answerRight(page);
-  await expect(page.locator('.results')).toContainText('Mastery: 1/3');
+  await expect(page.locator('.results')).toContainText('1/3 — get 5/5 again');
 });
 
 test('number pad: a wrong answer clears the box and he can try again', async ({ page }) => {
@@ -355,4 +355,26 @@ test('Iqra: opens up to Dhammah terbalik without a quiz; a round can be complete
   await expect(page.locator('.results h1')).toContainText('Amazing! All correct!');
   await page.getByRole('button', { name: /Next/ }).click();
   await expect(levelButton(page, 'Mix: a, i, u')).toBeEnabled();
+});
+
+test('daily practice: card on home, 2 rounds pay once; medals show under the avatar', async ({ page }) => {
+  await open(page, {
+    placed: { math: true }, frontier: { math: 'math-add5' },
+    settings: { practice: ['math-count5'] },
+    levels: { 'math-count5': { best: 5, cleared: true, perfectDays: [], mastered: false, rounds: 9 } },
+  });
+  await expect(page.locator('.big-btn.practice')).toContainText("Today's practice");
+  await page.locator('.big-btn.practice').click();
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await expect(page.locator('.results')).toContainText('Practice 1/2');
+  await expect(page.locator('.results')).toContainText('New medal!');
+  await expect(page.locator('.results .goal')).toContainText('3 crowns = 🪙 15');
+  await page.getByRole('button', { name: /Next/ }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.locator('.hero .shelf .medal')).toContainText('🥉');
+  await page.locator('.big-btn.practice').click();
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await expect(page.locator('.results')).toContainText("Today's practice done! (+10)");
+  await page.getByRole('button', { name: /Next/ }).click();
+  await expect(coins(page)).toHaveText('🪙 10');
 });

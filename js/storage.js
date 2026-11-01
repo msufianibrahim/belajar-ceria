@@ -13,7 +13,9 @@ const defaults = () => ({
   frontier: {},                 // subjectId -> furthest open level id (see progress.js)
   placed: {},                   // subjectId -> true once placement is done
   // lang: app + question language ('en' | 'ms'); mandarin: 'off' | 'mastered' | 'all' (see lang.js)
-  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, lang: 'en', mandarin: 'mastered' },
+  // practice: level ids the parent picked for daily practice (see rewards.js)
+  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, lang: 'en', mandarin: 'mastered', practice: [] },
+  practiceDay: { date: '', rounds: 0, paid: false },
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
 });
 

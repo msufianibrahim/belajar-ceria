@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { settleRound, COINS, MASTERY_DAYS } from '../js/rewards.js';
+import { settleRound, COINS, MASTERY_DAYS, medalCount } from '../js/rewards.js';
 
 const level = { id: 'lv', sticker: { id: 'st', e: '⭐' } };
 const fresh = () => ({ coins: 0, stickers: [], levels: {} });
@@ -75,4 +75,34 @@ test('typed levels: a perfect typed round counts toward mastery', () => {
   const r = settleRound(s, typedLevel, 5, 5, 'd1', { typed: true });
   assert.deepEqual(s.levels.tl.perfectDays, ['d1']);
   assert.equal(r.needsTyping, false);
+});
+
+test('daily practice: 2 rounds of a chosen topic pay a fixed bonus once a day, whatever the score', () => {
+  const s = { ...fresh(), settings: { practice: [level.id] } };
+  settleRound(s, level, 5, 5, 'd1');                   // first clear (10)
+  const r2 = settleRound(s, level, 2, 5, 'd1');
+  assert.equal(r2.practice.paid, true);
+  assert.equal(r2.coins, COINS.practice);
+  const r3 = settleRound(s, level, 2, 5, 'd1');
+  assert.equal(r3.coins, 0, 'no more practice coins today');
+  settleRound(s, level, 2, 5, 'd2');
+  assert.equal(settleRound(s, level, 2, 5, 'd2').coins, COINS.practice, 'again the next day');
+});
+
+test('rounds on a topic that is not daily practice never pay practice coins', () => {
+  const s = { ...fresh(), settings: { practice: ['other'] } };
+  settleRound(s, level, 5, 5, 'd1');
+  for (let i = 0; i < 5; i++) assert.equal(settleRound(s, level, 5, 5, 'd1').coins, 0);
+});
+
+test('medals at 10, 20, 30 finished rounds, any score, no coins', () => {
+  const s = fresh();
+  const medals = [];
+  for (let i = 1; i <= 30; i++) {
+    const r = settleRound(s, level, 1, 5, 'd1');
+    if (i > 1) assert.equal(r.coins, 0); // (the first round is a new best)
+    if (r.medal) medals.push([i, r.medal]);
+  }
+  assert.deepEqual(medals, [[10, '🥉'], [20, '🥈'], [30, '🥇']]);
+  assert.equal(medalCount(s.levels[level.id].rounds), 3);
 });

@@ -194,3 +194,19 @@ button:disabled { cursor: default; }
 .choices.stack { grid-template-columns: 1fr; }
 .choices.stack .choice { min-height: 110px; }
 .choices.stack .ar { font-size: 3.6rem; white-space: nowrap; }
+
+/* ---------- practice & medals ---------- */
+.shelf { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
+.medal { background: #fff; border-radius: 999px; padding: 4px 12px; box-shadow: 0 3px 0 #0001; font-size: 1.1rem; }
+.medal small { font-size: .8rem; color: #0009; }
+.medal .ar { font-size: 1.3rem; }
+.lvl-medal { margin-right: 6px; }
+.big-btn.practice { display: block; width: 100%; margin-bottom: 16px; background: #d9f2ff; text-align: left; }
+.big-btn.practice small { display: block; font-weight: 400; font-size: 1rem; margin-top: 4px; }
+.big-btn.practice.done { background: #e3f6e3; }
+.goal { background: #fff3c4; border-radius: 20px; padding: 14px 18px; margin: 10px auto 20px; max-width: 420px; display: flex; flex-direction: column; gap: 4px; }
+.goal .crowns { font-size: 2.4rem; letter-spacing: 6px; }
+.goal .crowns span { filter: grayscale(1); opacity: .35; }
+.goal .crowns span.got { filter: none; opacity: 1; }
+.goal small { font-size: 1rem; }
+.tag.coin { background: #fff3c4; color: #8a6d00; }

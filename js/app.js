@@ -1,6 +1,6 @@
 import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
-import { settleRound, MASTERY_DAYS } from './rewards.js';
+import { settleRound, MASTERY_DAYS, MEDALS, MEDAL_ROUNDS, medalCount, PRACTICE_ROUNDS, COINS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
 import { topIndex, isOpen, openUpTo, pickReview, answerMode } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
@@ -100,6 +100,46 @@ const topBar = (title) => `<header class="top">
   <div class="coins">🪙 ${state.coins}</div>
 </header>`;
 
+// Where a level lives: { subject, idx, level } or null.
+function findLevel(id) {
+  for (const subject of SUBJECTS) {
+    const idx = subject.levels.findIndex((l) => l.id === id);
+    if (idx >= 0) return { subject, idx, level: subject.levels[idx] };
+  }
+  return null;
+}
+const levelIcon = (subject, l) => (subject.voice === 'ar' ? `<span class="ar">${l.icon}</span>` : l.icon);
+
+// Practice medals, best first, shown under the avatar.
+function medalShelf() {
+  const earned = SUBJECTS.flatMap((subject) => subject.levels
+    .map((l) => ({ subject, l, n: medalCount(state.levels[l.id]?.rounds) }))
+    .filter((m) => m.n > 0));
+  if (!earned.length) return '';
+  earned.sort((a, b) => b.n - a.n);
+  return `<div class="shelf">${earned.map(({ subject, l, n }) =>
+    `<span class="medal">${MEDALS[n - 1]} ${levelIcon(subject, l)} <small>${N(l.title)}</small></span>`).join('')}</div>`;
+}
+
+// Today's practice: the parent's topics; the one with fewer rounds today comes next.
+function practiceToday() {
+  const picks = (state.settings.practice ?? []).map(findLevel).filter(Boolean);
+  if (!picks.length) return null;
+  const day = state.practiceDay?.date === todayKey() ? state.practiceDay : { rounds: 0, paid: false };
+  return { picks, next: picks[day.rounds % picks.length], rounds: Math.min(day.rounds, PRACTICE_ROUNDS), paid: day.paid };
+}
+
+function practiceCard() {
+  const p = practiceToday();
+  if (!p) return '';
+  const dots = Array.from({ length: PRACTICE_ROUNDS }, (_, k) => (k < p.rounds ? '●' : '○')).join('');
+  const topics = p.picks.map(({ subject, level }) => `${levelIcon(subject, level)} ${N(level.title)}`).join(' · ');
+  return `<button class="big-btn practice ${p.paid ? 'done' : ''}" data-act="practice">
+    🎯 ${tr("Today's practice", 'Latihan hari ini')}: ${topics}
+    <small>${p.paid ? tr('✓ Done today! Play more for medals', '✓ Siap hari ini! Main lagi untuk pingat') : `${dots} — ${tr(`${PRACTICE_ROUNDS} rounds`, `${PRACTICE_ROUNDS} pusingan`)} = 🪙 ${COINS.practice}`}</small>
+  </button>`;
+}
+
 const stars = (n, total) => '★'.repeat(n) + '☆'.repeat(Math.max(0, total - n));
 
 // ---------------------------------------------------------------- screens
@@ -114,9 +154,10 @@ function homeScreen() {
       <div class="coins">🪙 ${state.coins}</div>
       <button class="icon-btn parent-btn" data-act="gate" aria-label="${tr('Parents', 'Ibu bapa')}">⚙️</button>
     </header>
-    <section class="hero">${avatar()}<h1>Assalamualaikum${name}!</h1></section>
+    <section class="hero">${avatar()}${medalShelf()}<h1>Assalamualaikum${name}!</h1></section>
+    ${practiceCard()}
     <section class="subjects">${tiles}</section>
-    ${pickReview(state, SUBJECTS, todayKey()) ? `<button class="big-btn review" data-act="review">🔁 ${tr('Review', 'Ulang kaji')} <small>— ${tr('earn', 'dapatkan')} 👑</small></button>` : ''}
+    ${pickReview(state, SUBJECTS, todayKey()) ? `<button class="big-btn review" data-act="review">🔁 ${tr('Review', 'Ulang kaji')} <small>— 👑 = 🪙 ${COINS.mastery}</small></button>` : ''}
     <nav class="bottom">
       <button class="big-btn" data-act="go" data-arg="stickers">📒 ${tr('Stickers', 'Pelekat')} <b>${state.stickers.length}</b></button>
       <button class="big-btn" data-act="go" data-arg="shop">🛍️ ${tr('Shop', 'Kedai')}</button>
@@ -130,11 +171,14 @@ function subjectScreen() {
     const locked = !isOpen(state, s, i);
     const badge = locked ? '🔒' : r?.mastered ? '👑' : i + 1;
     const zh = !locked && questionLang(state, l.id, s.mandarin) === 'zh' ? '<span class="tag">华文</span>' : '';
-    const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS}</span>` : '';
+    const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS} → 🪙 ${COINS.mastery}</span>` : '';
+    // What this level can still pay, so he knows where the coins are.
+    const pays = locked || r?.mastered ? 0 : !r?.cleared ? COINS.firstClear : r.best < ROUND ? COINS.newBest : 0;
+    const coinTag = pays ? `<span class="tag coin">🪙 ${pays}</span>` : '';
     return `<li><button class="level ${locked ? 'locked' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
-      <span class="lvl-title">${s.voice === 'ar' ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${toward}</span>
-      <span class="stars">${stars(r?.best ?? 0, ROUND)}</span>
+      <span class="lvl-title">${s.voice === 'ar' ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${coinTag} ${toward}</span>
+      <span class="stars">${medalCount(r?.rounds) ? `<span class="lvl-medal">${MEDALS[medalCount(r.rounds) - 1]}</span>` : ''}${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
   return `${topBar(`${s.icon} ${N(s.name)}`)}<ol class="path">${items}</ol>`;
@@ -171,15 +215,36 @@ function resultTitle(res) {
   return tr('Good try!', 'Kamu sudah cuba!');
 }
 
+// The next step to 👑, in a box so he sees what replaying another day is worth.
+function masteryGoal(res, levelId) {
+  const r = state.levels[levelId];
+  if (!r || r.mastered) return '';
+  const crowns = Array.from({ length: MASTERY_DAYS }, (_, k) => `<span class="${k < r.perfectDays.length ? 'got' : ''}">👑</span>`).join('');
+  const msg = res.masteryProgress
+    ? tr(`${res.masteryProgress}/${MASTERY_DAYS} — get 5/5 again on another day!`, `${res.masteryProgress}/${MASTERY_DAYS} — dapat 5/5 lagi pada hari lain!`)
+    : r.perfectDays.includes(todayKey())
+      ? tr('Already counted today — come back tomorrow!', 'Sudah dikira hari ini — datang lagi esok!')
+      : tr('Get 5/5 to earn a crown!', 'Dapat 5/5 untuk dapat mahkota!');
+  return `<div class="goal"><div class="crowns">${crowns}</div>
+    <b>${tr(`${MASTERY_DAYS} crowns = 🪙 ${COINS.mastery}`, `${MASTERY_DAYS} mahkota = 🪙 ${COINS.mastery}`)}</b><small>${msg}</small></div>`;
+}
+
 function resultsScreen() {
   const { res, retries } = view;
   const lines = [];
   if (res.coins) lines.push(`🪙 +${res.coins} ${tr('coins', 'syiling')}`);
+  if (res.practice) lines.push(res.practice.paid
+    ? tr(`🎯 Today's practice done! (+${COINS.practice})`, `🎯 Latihan hari ini siap! (+${COINS.practice})`)
+    : res.practice.done < res.practice.of ? tr(`🎯 Practice ${res.practice.done}/${res.practice.of} — one more!`, `🎯 Latihan ${res.practice.done}/${res.practice.of} — satu lagi!`) : '');
+  if (res.medal) lines.push(tr(`${res.medal} New medal!`, `${res.medal} Pingat baru!`));
+  else {
+    const next = MEDAL_ROUNDS.find((n) => n > (state.levels[view.levelId]?.rounds ?? 0));
+    if (next) lines.push(tr(`🏅 ${state.levels[view.levelId].rounds}/${next} rounds to the next medal`, `🏅 ${state.levels[view.levelId].rounds}/${next} pusingan ke pingat seterusnya`));
+  }
   if (res.sticker) lines.push(`${res.sticker.e} ${tr('New sticker!', 'Pelekat baru!')}`);
   if (res.newBest) lines.push(tr('⬆️ New best score!', '⬆️ Markah terbaik baru!'));
   if (res.needsTyping) lines.push(tr('⌨️ Next time, type the answer to earn 👑', '⌨️ Lain kali taip jawapan untuk dapat 👑'));
   if (res.justMastered) lines.push(tr('👑 You mastered it!', '👑 Kamu sudah mahir!'));
-  else if (res.masteryProgress) lines.push(tr(`👑 Mastery: ${res.masteryProgress}/${MASTERY_DAYS} days — play again another day!`, `👑 Mahir: ${res.masteryProgress}/${MASTERY_DAYS} hari — main lagi hari lain!`));
   if (retries && res.passed) lines.push(tr('🌱 You kept trying — that is great!', '🌱 Kamu terus mencuba — itu hebat!'));
   if (!res.passed) lines.push(tr("💪 Let's try once more — you can do it!", '💪 Jom cuba sekali lagi — kamu boleh!'));
   const emoji = res.score === res.total ? ' 🎉' : res.passed ? ' 👏' : '';
@@ -187,7 +252,8 @@ function resultsScreen() {
     ${avatar(res.passed ? 'happy' : 'smile')}
     <h1>${resultTitle(res)}${emoji}</h1>
     <div class="stars big">${stars(res.score, res.total)}</div>
-    <ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul>
+    <ul>${lines.filter(Boolean).map((l) => `<li>${l}</li>`).join('')}</ul>
+    ${masteryGoal(res, view.levelId)}
     <div class="row">
       <button class="big-btn" data-act="play" data-arg="${view.levelIdx}">🔁 ${tr('Play again', 'Main lagi')}</button>
       <button class="big-btn primary" data-act="subject" data-arg="${view.subjectId}">➡️ ${tr('Next', 'Seterusnya')}</button>
@@ -227,7 +293,7 @@ function shopScreen() {
         : `<div class="row"><button class="big-btn" data-act="buyNo">${tr('No', 'Tidak')}</button><button class="big-btn primary" data-act="buyYes">${tr('Buy!', 'Beli!')}</button></div>`}
     </div>`;
   }
-  return `${topBar(`🛍️ ${tr('Shop', 'Kedai')}`)}<section class="hero small">${avatar()}</section>${rows}${sheet}`;
+  return `${topBar(`🛍️ ${tr('Shop', 'Kedai')}`)}<section class="hero small">${avatar()}${medalShelf()}</section>${rows}${sheet}`;
 }
 
 function sleepyScreen() {
@@ -289,6 +355,14 @@ function parentScreen() {
     <section class="panel"><h3>${tr('Maths in Mandarin', 'Matematik dalam 华文')}</h3>
       <label>华文 (Mandarin) ${textSelect('mandarin', [['off', tr('Off', 'Tutup')], ['mastered', tr('👑 levels only', 'Tahap 👑 sahaja')], ['all', tr('All levels', 'Semua tahap')]])}</label>
       <p class="muted">${tr('👑 levels only: mastered levels ask in 华文 + pinyin + English subtitle, so only the language is new.', 'Tahap 👑 sahaja: soalan dalam 华文 + pinyin + sari kata English untuk tahap yang sudah mahir, supaya hanya bahasa yang baru.')}</p>
+    </section>
+    <section class="panel"><h3>${tr('Daily practice', 'Latihan harian')}</h3>
+      <p class="muted">${tr(`Topics to drill. ${PRACTICE_ROUNDS} rounds a day = 🪙 ${COINS.practice}, once a day.`, `Topik untuk diulang. ${PRACTICE_ROUNDS} pusingan sehari = 🪙 ${COINS.practice}, sekali sehari.`)}</p>
+      ${[0, 1].map((k) => `<label>${tr('Topic', 'Topik')} ${k + 1} <select data-practice="${k}">
+        <option value="">—</option>
+        ${SUBJECTS.filter((sub) => sub.levels.length).map((sub) => `<optgroup label="${esc(L(state, sub.name))}">${sub.levels.map((l) =>
+          `<option value="${l.id}" ${state.settings.practice?.[k] === l.id ? 'selected' : ''}>${N(l.title)}</option>`).join('')}</optgroup>`).join('')}
+      </select></label>`).join('')}
     </section>
     <section class="panel"><h3>${tr('Real-world rewards', 'Hadiah dunia sebenar')}</h3>
       <p class="muted">${tr('Give a sticker when your child does these with you.', 'Beri pelekat bila anak buat aktiviti ini bersama anda.')}</p>${tasks}
@@ -438,7 +512,7 @@ function finishRound() {
   const res = settleRound(state, level, view.score, view.qs.length, todayKey(), { typed: view.mode === 'type' });
   if (res.passed) openUpTo(state, s, view.levelIdx + 1);
   persist();
-  go('results', { subjectId: s.id, levelIdx: view.levelIdx, res, retries: view.retries });
+  go('results', { subjectId: s.id, levelIdx: view.levelIdx, levelId: level.id, res, retries: view.retries });
   say(resultTitle(res));
 }
 
@@ -516,6 +590,10 @@ const ACTIONS = {
     return state.placed[id] ? go('subject', { subjectId: id }) : startPlacement(id);
   },
   play: (i) => startRound(view.subjectId, Number(i)),
+  practice: () => {
+    const p = practiceToday();
+    if (p) startRound(p.next.subject.id, p.next.idx);
+  },
   review: () => {
     const r = pickReview(state, SUBJECTS, todayKey());
     if (r) startRound(r.subjectId, r.levelIdx);
@@ -567,6 +645,12 @@ app.addEventListener('change', (e) => {
     state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : t.dataset.kind === 'text' ? t.value : Number(t.value);
     persist();
     if (t.dataset.setting === 'lang') render();
+  } else if (t.dataset.practice) {
+    const picks = [...(state.settings.practice ?? [])];
+    picks[Number(t.dataset.practice)] = t.value;
+    state.settings.practice = [...new Set(picks.filter(Boolean))];
+    persist();
+    render();
   } else if (t.dataset.unlock) {
     // Parent override: open levels he already knows (never locks levels again).
     const sub = subjectById(t.dataset.unlock);
