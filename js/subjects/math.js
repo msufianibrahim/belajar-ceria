@@ -262,6 +262,7 @@ export default {
   name: { en: 'Maths', ms: 'Matematik' },
   icon: '🔢',
   color: '#ffb74d',
+  mandarin: true,       // questions can switch to 华文 (see lang.js)
   // typed: answered on a number pad once passed (see progress.js answerMode).
   // needs: also opens once that level is passed (see progress.js isOpen).
   // probe: false = stepping stone; placement skips it (it opens with the levels around it).

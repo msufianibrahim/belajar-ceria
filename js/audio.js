@@ -24,15 +24,16 @@ function pickVoice(lang) {
   );
 }
 
-export function speak(text, lang = 'ms-MY') {
+// queue: speak after whatever is playing (e.g. an Arabic sound after the prompt).
+export function speak(text, lang = 'ms-MY', { queue = false, rate = 0.9 } = {}) {
   if (!hasTts) return;
-  speechSynthesis.cancel();
+  if (!queue) speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   const v = pickVoice(lang);
   if (v) u.voice = v;
   u.lang = v?.lang ?? lang;
-  u.rate = 0.9;
-  u.pitch = 1.1;
+  u.rate = rate;
+  u.pitch = lang.startsWith('ar') ? 1 : 1.1;
   speechSynthesis.speak(u);
 }
 

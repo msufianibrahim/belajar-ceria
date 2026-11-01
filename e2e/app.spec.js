@@ -43,7 +43,7 @@ const placed = { placed: { math: true } };
 test('home: Math is open, other subjects are coming soon', async ({ page }) => {
   await open(page);
   await expect(page.getByRole('button', { name: /Maths/ })).toBeEnabled();
-  await expect(page.locator('.tile.locked')).toHaveCount(6);
+  await expect(page.locator('.tile.locked')).toHaveCount(5);
   await expect(coins(page)).toHaveText('🪙 0');
 });
 
@@ -341,4 +341,18 @@ test('passing Add within 5 opens Add within 10 straight away', async ({ page }) 
   await page.getByRole('button', { name: /Next/ }).click();
   await expect(levelButton(page, 'Add within 10')).toBeEnabled();
   await expect(levelButton(page, 'Pairs of 10')).toBeDisabled();
+});
+
+test('Iqra: opens up to Dhammah terbalik without a quiz; a round can be completed', async ({ page }) => {
+  await open(page);
+  await page.getByRole('button', { name: /Iqra/ }).click();
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(7);
+  await expect(levelButton(page, 'Mix: a, i, u')).toBeDisabled();
+  await levelButton(page, 'Dhammah terbalik').click();
+  await expect(page.locator('.speak')).toContainText('Which one is this?');
+  await expect(page.locator('.choice .ar')).toHaveCount(3);
+  for (let i = 0; i < 5; i++) await answerRight(page);
+  await expect(page.locator('.results h1')).toContainText('Amazing! All correct!');
+  await page.getByRole('button', { name: /Next/ }).click();
+  await expect(levelButton(page, 'Mix: a, i, u')).toBeEnabled();
 });

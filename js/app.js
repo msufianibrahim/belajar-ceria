@@ -129,11 +129,11 @@ function subjectScreen() {
     const r = state.levels[l.id];
     const locked = !isOpen(state, s, i);
     const badge = locked ? '🔒' : r?.mastered ? '👑' : i + 1;
-    const zh = !locked && questionLang(state, l.id) === 'zh' ? '<span class="tag">华文</span>' : '';
+    const zh = !locked && questionLang(state, l.id, s.mandarin) === 'zh' ? '<span class="tag">华文</span>' : '';
     const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS}</span>` : '';
     return `<li><button class="level ${locked ? 'locked' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
-      <span class="lvl-title">${l.icon} ${N(l.title)} ${zh} ${toward}</span>
+      <span class="lvl-title">${s.voice === 'ar' ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${toward}</span>
       <span class="stars">${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
@@ -150,7 +150,7 @@ function questionScreen() {
     <div class="question">
       ${q.visual ? `<div class="visual">${q.visual}</div>` : ''}
       ${q.text ? `<div class="qtext">${q.text}</div>` : ''}
-      <button class="speak" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
+      <button class="speak ${q.sound ? 'listen' : ''}" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
     </div>
     ${view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''}">
       ${q.choices.map((c, k) => `<button class="choice" data-act="answer" data-arg="${k}">${c.label}</button>`).join('')}
@@ -305,8 +305,16 @@ function parentScreen() {
 // ---------------------------------------------------------------- rounds
 
 const currentQ = () => (view.name === 'play' ? view.qs[view.i] : view.q);
-const currentLang = () => questionLang(state, subjectById(view.subjectId).levels[view.levelIdx].id);
-const sayQuestion = () => say(currentQ().prompt[currentLang()], currentLang());
+const currentLang = () => {
+  const s = subjectById(view.subjectId);
+  return questionLang(state, s.levels[view.levelIdx].id, s.mandarin);
+};
+// The prompt, then (Iqra) the sound itself, slower, in the subject's voice.
+function sayQuestion() {
+  const q = currentQ();
+  say(q.prompt[currentLang()], currentLang());
+  if (q.sound && state.settings.voice) speak(q.sound, VOICE[subjectById(view.subjectId).voice], { queue: true, rate: 0.7 });
+}
 
 // Mandarin shows characters, pinyin, and an English subtitle.
 function promptHtml(p, lang) {
@@ -498,7 +506,15 @@ const ACTIONS = {
     if (['play', 'results'].includes(view.name)) go('subject', { subjectId: view.subjectId });
     else go('home');
   },
-  subject: (id) => (state.placed[id] ? go('subject', { subjectId: id }) : startPlacement(id)),
+  subject: (id) => {
+    const s = subjectById(id);
+    if (!state.placed[id] && s.placement === false) {
+      state.placed[id] = true;
+      openUpTo(state, s, Math.max(0, s.levels.findIndex((l) => l.id === s.startAt)));
+      persist();
+    }
+    return state.placed[id] ? go('subject', { subjectId: id }) : startPlacement(id);
+  },
   play: (i) => startRound(view.subjectId, Number(i)),
   review: () => {
     const r = pickReview(state, SUBJECTS, todayKey());

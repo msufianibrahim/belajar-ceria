@@ -1,13 +1,15 @@
 // Question language. Mandarin is introduced on levels the child has already
 // mastered, so only the language is new, not the maths.
 
-export const VOICE = { ms: 'ms-MY', en: 'en-GB', zh: 'zh-CN' };
+export const VOICE = { ms: 'ms-MY', en: 'en-GB', zh: 'zh-CN', ar: 'ar-SA' };
 
 // Pick the app language from a { en, ms } pair; plain strings pass through.
 export const L = (state, v) => (v && typeof v === 'object' ? v[state.settings.lang] ?? v.en : v);
 
-export function questionLang(state, levelId) {
+// zh: whether this subject can ask in Mandarin (Maths only for now).
+export function questionLang(state, levelId, zh = true) {
   const { lang, mandarin } = state.settings;
+  if (!zh) return lang;
   if (mandarin === 'all') return 'zh';
   if (mandarin === 'mastered' && state.levels[levelId]?.mastered) return 'zh';
   return lang;
