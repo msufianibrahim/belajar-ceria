@@ -152,7 +152,7 @@ function questionScreen() {
       ${q.text ? `<div class="qtext">${q.text}</div>` : ''}
       <button class="speak ${q.sound ? 'listen' : ''}" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
     </div>
-    ${view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''}">
+    ${view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''} ${q.stack ? 'stack' : ''}">
       ${q.choices.map((c, k) => `<button class="choice" data-act="answer" data-arg="${k}">${c.label}</button>`).join('')}
     </div>`}`;
 }

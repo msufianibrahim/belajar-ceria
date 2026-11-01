@@ -20,15 +20,16 @@ export function numberChoices(answer, lo, hi, count = 3) {
 }
 
 // n questions from a generator, avoiding repeats within the round where possible.
+// gen gets the question's position (0..n-1) so a round can get harder as it goes.
 export function makeRound(gen, n) {
   const qs = [];
   const seen = new Set();
   for (let tries = 0; qs.length < n && tries < 200; tries++) {
-    const q = gen();
+    const q = gen(qs.length);
     if (seen.has(q.key)) continue;
     seen.add(q.key);
     qs.push(q);
   }
-  while (qs.length < n) qs.push(gen());
+  while (qs.length < n) qs.push(gen(qs.length));
   return qs;
 }
