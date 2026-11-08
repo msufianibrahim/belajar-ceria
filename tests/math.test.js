@@ -4,7 +4,7 @@ import math from '../js/subjects/math.js';
 import { makeRound } from '../js/subjects/util.js';
 
 test('every math question has its answer among distinct choices', () => {
-  for (const level of math.levels) {
+  for (const level of math.levels.filter((l) => !l.id.startsWith('math-col'))) {
     for (let n = 0; n < 500; n++) {
       const q = level.gen();
       const values = q.choices.map((c) => c.value);
@@ -46,6 +46,7 @@ test('the learning path is in the agreed order', () => {
     'math-count5', 'math-numerals', 'math-count10', 'math-compare', 'math-sequence',
     'math-countback10', 'math-bond5', 'math-add5', 'math-less', 'math-sub5',
     'math-bond10', 'math-add10', 'math-sub10', 'math-add9', 'math-count20', 'math-add20', 'math-countback20', 'math-sub20',
+    'math-col-add', 'math-col-sub', 'math-col-add-carry', 'math-col-sub-borrow',
   ]);
 });
 
@@ -206,5 +207,22 @@ test('adding and taking away show the written sum only, no pictures to count', (
       assert.ok(q.text);
       assert.ok(!q.visual, id);
     });
+  }
+});
+
+test('column sums: 2-digit numbers, answers under 100, carrying/borrowing only where the level says', () => {
+  const lv = (id) => math.levels.find((l) => l.id === id);
+  for (const [id, op, regroup] of [['math-col-add', '+', false], ['math-col-sub', '-', false], ['math-col-add-carry', '+', true], ['math-col-sub-borrow', '-', true]]) {
+    for (let n = 0; n < 300; n++) for (let pos = 0; pos < 10; pos++) {
+      const q = lv(id).gen(pos);
+      const { a, b } = q.column;
+      assert.equal(q.column.op, op);
+      assert.ok(a >= 10 && a <= 99 && b >= 1, `${id}: ${a} ${op} ${b}`);
+      assert.ok(pos < 3 ? b < 10 : b >= 10, `${id} pos ${pos}: b = ${b}`);
+      assert.equal(q.answer, op === '+' ? a + b : a - b);
+      assert.ok(q.answer >= 0 && q.answer < 100, `${id}: ${q.answer}`);
+      const crosses = op === '+' ? (a % 10) + (b % 10) >= 10 : (a % 10) < (b % 10);
+      assert.equal(crosses, regroup, `${id}: ${a} ${op} ${b}`);
+    }
   }
 });

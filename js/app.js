@@ -7,6 +7,7 @@ import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
 import { avatarSvg } from './avatar.js';
+import { recognize } from './digits.js';
 import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
 
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
@@ -198,13 +199,34 @@ function questionScreen() {
     <div class="question">
       ${q.visual ? `<div class="visual">${q.visual}</div>` : ''}
       ${q.text ? `<div class="qtext">${q.text}</div>` : ''}
+      ${q.column ? columnSum(q.column, view.mode !== 'type' && state.settings.columnInput !== 'pad') : ''}
       ${q.read ? `<div class="read ar">${q.read}</div>` : ''}
       <button class="speak" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
     </div>
-    ${q.read ? checker() : view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''} ${q.stack ? 'stack' : ''}">
+    ${q.read ? checker() : q.column ? (state.settings.columnInput === 'pad' ? keypad() : boardButtons()) : view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''} ${q.stack ? 'stack' : ''}">
       ${q.choices.map((c, k) => `<button class="choice" data-act="answer" data-arg="${k}">${c.label}</button>`).join('')}
     </div>`}`;
 }
+
+// Column sum set out like school: digits in tens/ones columns. With `write`, he writes
+// the answer digits on whiteboard boxes (and carries on the scratch strip above).
+function columnSum({ a, b, op }, write) {
+  const digits = (n) => [n >= 10 ? Math.floor(n / 10) : '', n % 10].map((d) => `<span>${d}</span>`).join('');
+  return `<div class="colsum">
+    ${write ? '<span></span><canvas class="pad scratch" aria-label="scratch"></canvas>' : ''}
+    <span></span>${digits(a)}
+    <span class="op">${op === '-' ? '−' : '+'}</span>${digits(b)}
+    <span class="rule"></span>
+    ${write ? `<span></span>
+      <div class="box"><canvas class="pad ans" data-col="t"></canvas><small data-read="t"></small></div>
+      <div class="box"><canvas class="pad ans" data-col="o"></canvas><small data-read="o"></small></div>` : ''}
+  </div>`;
+}
+
+const boardButtons = () => `<div class="board-btns">
+    <button class="key del" data-act="wipe">🧽 ${tr('Clear', 'Padam')}</button>
+    <button class="key ok" data-act="check-written" aria-label="${tr('Check', 'Semak')}">✓</button>
+  </div>`;
 
 // Read-aloud questions (Iqra): a grown-up listens and marks it.
 const checker = () => `<div class="checker">
@@ -365,6 +387,10 @@ function parentScreen() {
       <p class="muted">${tr('This session', 'Sesi ini')}: ${Math.round(s.usedMs / 60000)} ${tr('min', 'minit')}${resting ? ` · ${tr('Resting until', 'Sedang rehat hingga')} ${clock(s.restUntil)}` : ''}</p>
       ${resting ? `<button class="btn" data-act="endRest">${tr('End rest now', 'Tamatkan rehat sekarang')}</button>` : ''}
       <label>${tr('Voice', 'Suara arahan')} <input type="checkbox" data-setting="voice" ${state.settings.voice ? 'checked' : ''}></label>
+      <label>${tr('Column sums', 'Bentuk lazim')} <select data-setting="columnInput" data-kind="text">
+        <option value="write" ${state.settings.columnInput !== 'pad' ? 'selected' : ''}>${tr('Write the answer', 'Tulis jawapan')}</option>
+        <option value="pad" ${state.settings.columnInput === 'pad' ? 'selected' : ''}>${tr('Number pad', 'Pad nombor')}</option>
+      </select></label>
     </section>
     <section class="panel"><h3>${tr('Maths in Mandarin', 'Matematik dalam 华文')}</h3>
       <label>华文 (Mandarin) ${textSelect('mandarin', [['off', tr('Off', 'Tutup')], ['mastered', tr('👑 levels only', 'Tahap 👑 sahaja')], ['all', tr('All levels', 'Semua tahap')]])}</label>
@@ -519,6 +545,108 @@ function typeEnter() {
   markWrong();
 }
 
+// ---------------------------------------------------------------- whiteboard
+
+// Strokes live on the canvas element: [[[x, y], ...], ...] in CSS pixels.
+let stroke = null;
+let readTimer = 0;
+
+function padStart(e) {
+  const c = e.target.closest('canvas.pad');
+  if (!c || view.busy) return;
+  e.preventDefault();
+  if (!c.strokes) {
+    const r = window.devicePixelRatio || 1;
+    c.width = c.clientWidth * r;
+    c.height = c.clientHeight * r;
+    c.getContext('2d').scale(r, r);
+    c.strokes = [];
+  }
+  c.setPointerCapture?.(e.pointerId);
+  const p = padPoint(c, e);
+  stroke = { c, pts: [p] };
+  c.strokes.push(stroke.pts);
+  const ctx = c.getContext('2d');
+  ctx.lineWidth = c.classList.contains('scratch') ? 4 : 7;
+  ctx.lineCap = ctx.lineJoin = 'round';
+  ctx.strokeStyle = '#3b2f2f';
+  ctx.beginPath();
+  ctx.arc(p[0], p[1], ctx.lineWidth / 2, 0, Math.PI * 2);
+  ctx.fillStyle = '#3b2f2f';
+  ctx.fill();
+}
+
+function padMove(e) {
+  if (!stroke) return;
+  e.preventDefault();
+  const p = padPoint(stroke.c, e);
+  const last = stroke.pts[stroke.pts.length - 1];
+  stroke.pts.push(p);
+  const ctx = stroke.c.getContext('2d');
+  ctx.beginPath();
+  ctx.moveTo(last[0], last[1]);
+  ctx.lineTo(p[0], p[1]);
+  ctx.stroke();
+}
+
+function padEnd() {
+  if (!stroke) return;
+  stroke = null;
+  clearTimeout(readTimer);
+  readTimer = setTimeout(showReads, 450);
+}
+
+const padPoint = (c, e) => {
+  const r = c.getBoundingClientRect();
+  return [e.clientX - r.left, e.clientY - r.top];
+};
+
+// What the app reads in each answer box, shown under it so he can fix it before ✓.
+function readBoxes() {
+  const out = {};
+  for (const c of app.querySelectorAll('canvas.ans')) {
+    const strokes = c.strokes ?? [];
+    out[c.dataset.col] = strokes.length ? (recognize(strokes)?.digit ?? '?') : '';
+  }
+  return out;
+}
+
+function showReads() {
+  const reads = readBoxes();
+  for (const [col, v] of Object.entries(reads)) {
+    const el = app.querySelector(`[data-read="${col}"]`);
+    if (el) el.textContent = v === '' ? '' : String(v);
+  }
+}
+
+function clearPads(selector) {
+  for (const c of app.querySelectorAll(selector)) {
+    c.getContext('2d').clearRect(0, 0, c.width, c.height);
+    c.strokes = c.strokes && [];
+  }
+  showReads();
+}
+
+function checkWritten() {
+  if (view.busy) return;
+  const { t, o } = readBoxes();
+  if (o === '') return say(tr('Write your answer in the boxes.', 'Tulis jawapan dalam kotak.'));
+  if (t === '?' || o === '?') return say(tr("I can't read that. Write it again.", 'Tak dapat baca. Tulis sekali lagi.'));
+  const value = (t === '' ? 0 : t) * 10 + o;
+  const board = app.querySelector('.colsum');
+  if (value === currentQ().answer) return markRight(board);
+  clearPads('canvas.ans');
+  board.classList.remove('wrong');
+  void board.offsetWidth;
+  board.classList.add('wrong');
+  markWrong();
+}
+
+app.addEventListener('pointerdown', padStart);
+app.addEventListener('pointermove', padMove);
+app.addEventListener('pointerup', padEnd);
+app.addEventListener('pointercancel', padEnd);
+
 function finishRound() {
   const s = subjectById(view.subjectId);
   const level = s.levels[view.levelIdx];
@@ -612,6 +740,8 @@ const ACTIONS = {
     if (r) startRound(r.subjectId, r.levelIdx);
   },
   answer: (k, el) => answer(Number(k), el),
+  wipe: () => clearPads('canvas.pad'),
+  'check-written': () => checkWritten(),
   check: (k, el) => { if (view.busy) return; if (k === '1') markRight(el); else markWrong(); },
   key: (d) => typeKey(d),
   del: () => typeDelete(),

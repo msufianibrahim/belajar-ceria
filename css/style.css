@@ -215,3 +215,16 @@ button:disabled { cursor: default; }
 .goal .crowns span.got { filter: none; opacity: 1; }
 .goal small { font-size: 1rem; }
 .tag.coin { background: #fff3c4; color: #8a6d00; }
+
+/* Column sums and the whiteboard */
+.colsum { display: grid; grid-template-columns: 60px 120px 120px; justify-content: center; align-items: center; gap: 6px 10px; font-size: 4.2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.colsum > span { text-align: center; line-height: 1.1; }
+.colsum .op { font-size: 3.4rem; }
+.colsum .rule { grid-column: 1 / -1; height: 6px; background: #3b2f2f; border-radius: 3px; margin: 4px 0 8px; }
+.colsum.wrong { animation: shake .4s; }
+.colsum.right .ans { background: #d6f5db; }
+.pad { touch-action: none; display: block; width: 100%; border-radius: 14px; }
+.pad.scratch { grid-column: 2 / 4; height: 64px; background: repeating-linear-gradient(90deg, #fff8e7 0 118px, #f0e6d2 118px 128px); }
+.pad.ans { height: 150px; background: #fff8e7; border: 3px dashed #d9c9a8; }
+.box small { display: block; font-size: 1.2rem; height: 1.5rem; color: #0008; font-weight: 600; }
+.board-btns { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-top: 16px; }

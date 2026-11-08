@@ -397,3 +397,45 @@ test('parent sets daily practice to 3 rounds; the home card shows it', async ({ 
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('.big-btn.practice')).toContainText('3 rounds = 🪙 15');
 });
+
+// Draw a digit in a whiteboard box with the mouse, using the recognizer's own template shape.
+async function drawDigit(page, col, digit) {
+  const strokes = await page.evaluate(async (d) => (await import('/js/digits.js'))._templates[d][0], digit);
+  const box = await page.locator(`canvas.ans[data-col="${col}"]`).boundingBox();
+  const at = ([x, y]) => [box.x + box.width * (0.2 + 0.6 * x / 100), box.y + box.height * (0.15 + 0.7 * y / 100)];
+  for (const s of strokes) {
+    await page.mouse.move(...at(s[0]));
+    await page.mouse.down();
+    for (const p of s.slice(1)) await page.mouse.move(...at(p), { steps: 3 });
+    await page.mouse.up();
+  }
+}
+
+test('column add: he writes the answer digits on the whiteboard; a wrong one is cleared', async ({ page }) => {
+  const passed = { best: 10, of: 10, cleared: true, perfectDays: [], mastered: false };
+  await open(page, { placed: { math: true }, frontier: { math: 'math-add10' }, levels: { 'math-add10': passed } });
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await levelButton(page, 'Column add').first().click();
+  await expect(page.locator('.colsum canvas.ans')).toHaveCount(2);
+  const answer = await page.evaluate(() => window.__test.answer());
+  const wrong = (answer + 1) % 10 === answer % 10 ? answer : (answer % 10 + 1) % 10;
+  await drawDigit(page, 'o', wrong);
+  await expect(page.locator('[data-read="o"]')).toHaveText(String(wrong));
+  await page.getByRole('button', { name: 'Check' }).click();
+  await expect(page.locator('[data-read="o"]')).toHaveText('');
+  if (answer >= 10) await drawDigit(page, 't', Math.floor(answer / 10));
+  await drawDigit(page, 'o', answer % 10);
+  await expect(page.locator('[data-read="o"]')).toHaveText(String(answer % 10));
+  await page.getByRole('button', { name: 'Check' }).click();
+  await expect(page.locator('.dots .done')).toHaveCount(1);
+});
+
+test('column sums can use the number pad instead (parent setting)', async ({ page }) => {
+  const passed = { best: 10, of: 10, cleared: true, perfectDays: [], mastered: false };
+  await open(page, { placed: { math: true }, settings: { columnInput: 'pad' }, levels: { 'math-sub10': passed } });
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await levelButton(page, 'Column subtract').first().click();
+  await expect(page.locator('.colsum')).toBeVisible();
+  for (let i = 0; i < 10; i++) await answerRight(page);
+  await expect(page.locator('.results h1')).toContainText('Amazing! All correct!');
+});

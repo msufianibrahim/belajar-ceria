@@ -275,6 +275,39 @@ function subtractTeen() {
   };
 }
 
+// Column (vertical) sums with 2-digit numbers, written the way school sets them out.
+// The first 3 of a round add or take a 1-digit number. `regroup`: carrying / borrowing.
+function column(op, regroup, pos) {
+  const small = pos < 3;
+  for (;;) {
+    let at, ao, bt, bo;
+    if (op === '+') {
+      ao = regroup ? rand(1, 9) : rand(0, 9);
+      bo = regroup ? rand(10 - ao, 9) : rand(0, 9 - ao);
+      at = rand(1, regroup ? 7 : 8);
+      bt = small ? 0 : rand(1, (regroup ? 8 : 9) - at);
+    } else {
+      at = rand(regroup ? 2 : 1, 9);
+      ao = regroup ? rand(0, 8) : rand(0, 9);
+      bo = regroup ? rand(ao + 1, 9) : rand(0, ao);
+      bt = small ? 0 : rand(1, regroup ? at - 1 : at);
+    }
+    const a = at * 10 + ao, b = bt * 10 + bo;
+    if (!b || (op === '-' && b === a)) continue;
+    const answer = op === '+' ? a + b : a - b;
+    return {
+      key: `c${a}${op}${b}`,
+      prompt: op === '+' ? {
+        ms: `${a} tambah ${b}, jadi berapa?`, en: `${a} plus ${b} makes how many?`,
+        zh: `${a}加${b}等于几？`, py: `${py(a)} jiā ${py(b)} děngyú jǐ?`,
+      } : subPrompt(a, b),
+      column: { a, b, op },
+      choices: [],
+      answer,
+    };
+  }
+}
+
 // Level ids are stored in saved progress: don't rename them once in use.
 export default {
   id: 'math',
@@ -304,5 +337,10 @@ export default {
     { id: 'math-add20', typed: true, needs: 'math-add10', title: { en: 'Add within 20', ms: 'Tambah hingga 20' }, icon: '➕', sticker: { id: 'st-crocodile', e: '🐊' }, gen: () => addTeen() },
     { id: 'math-countback20', title: { en: 'Count back from 20', ms: 'Kira undur hingga 20' }, icon: '⬅️', probe: false, sticker: { id: 'st-kangaroo', e: '🦘' }, gen: () => countBack(12, 20) },
     { id: 'math-sub20', typed: true, needs: 'math-sub10', title: { en: 'Subtract within 20', ms: 'Tolak hingga 20' }, icon: '➖', sticker: { id: 'st-hedgehog', e: '🦔' }, gen: () => subtractTeen() },
+    // Column sums: answered by writing digits (see digits.js), or the number pad if the parent picks it.
+    { id: 'math-col-add', probe: false, needs: 'math-add10', title: { en: 'Column add', ms: 'Tambah bentuk lazim' }, icon: '🧾', sticker: { id: 'st-shark', e: '🦈' }, gen: (pos) => column('+', false, pos) },
+    { id: 'math-col-sub', probe: false, needs: 'math-sub10', title: { en: 'Column subtract', ms: 'Tolak bentuk lazim' }, icon: '🧾', sticker: { id: 'st-rabbit', e: '🐰' }, gen: (pos) => column('-', false, pos) },
+    { id: 'math-col-add-carry', probe: false, needs: 'math-col-add', title: { en: 'Column add, carrying', ms: 'Tambah bentuk lazim, mengumpul semula' }, icon: '🧾', sticker: { id: 'st-frog', e: '🐸' }, gen: (pos) => column('+', true, pos) },
+    { id: 'math-col-sub-borrow', probe: false, needs: 'math-col-sub', title: { en: 'Column subtract, borrowing', ms: 'Tolak bentuk lazim, mengumpul semula' }, icon: '🧾', sticker: { id: 'st-chick', e: '🐥' }, gen: (pos) => column('-', true, pos) },
   ],
 };
