@@ -20,6 +20,11 @@ async function typeAnswer(page, value) {
 }
 
 async function answerRight(page) {
+  if (await page.locator('.checker').count()) {
+    await page.locator('.check.yes').click();
+    await expect(page.locator('.check.right')).toHaveCount(0);
+    return;
+  }
   if (await page.locator('.keypad').count()) {
     await typeAnswer(page, await page.evaluate(() => window.__test.answer()));
     await expect(page.locator('.typed.right')).toHaveCount(0);
@@ -349,10 +354,13 @@ test('Iqra: opens up to Dhammah terbalik without a quiz; a round can be complete
   await expect(page.locator('.level:not(.locked)')).toHaveCount(7);
   await expect(levelButton(page, 'Mix: a, i, u')).toBeDisabled();
   await levelButton(page, 'Dhammah terbalik').click();
-  await expect(page.locator('.speak')).toContainText('Which one is this?');
-  await expect(page.locator('.choice .ar')).toHaveCount(3);
+  await expect(page.locator('.speak')).toContainText('Read it aloud!');
+  await expect(page.locator('.read.ar')).toHaveCount(1);
+  await expect(page.locator('.choice')).toHaveCount(0);
+  await page.locator('.check.no').click();               // grown-up: try again
+  await expect(page.locator('.dots .done')).toHaveCount(0);
   for (let i = 0; i < 10; i++) await answerRight(page);
-  await expect(page.locator('.results h1')).toContainText('Amazing! All correct!');
+  await expect(page.locator('.results h1')).toContainText('Well done!');  // 9/10: first one needed a retry
   await page.getByRole('button', { name: /Next/ }).click();
   await expect(levelButton(page, 'Mix: a, i, u')).toBeEnabled();
 });

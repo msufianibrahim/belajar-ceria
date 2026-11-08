@@ -188,8 +188,13 @@ button:disabled { cursor: default; }
 .ar { font-family: "Iqra Naskh", "Noto Naskh Arabic", "Geeza Pro", serif; direction: rtl; font-weight: 400; }
 .choice .ar { font-size: 5rem; line-height: 1.7; }
 .lvl-ar { font-size: 1.6rem; margin: 0 4px; }
-.speak.listen { font-size: 1.4rem; padding: 18px 30px; }
-.speak.listen::first-letter { font-size: 3rem; }
+.read { font-size: 5.5rem; line-height: 1.8; margin-bottom: 10px; }
+.checker { margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.checker p { grid-column: 1 / -1; margin: 0; color: #0009; }
+.check { border: 0; border-radius: var(--radius); padding: 22px 0; font: inherit; font-size: 1.5rem; font-weight: 800; box-shadow: 0 5px 0 #0002; }
+.check.yes { background: #b8ecc0; }
+.check.no { background: #ffd2d2; }
+.check.right { background: #5cc46b; color: #fff; }
 .choice .ar { font-weight: 500; }
 .choices.stack { grid-template-columns: 1fr; }
 .choices.stack .choice { min-height: 110px; }

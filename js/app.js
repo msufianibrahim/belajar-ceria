@@ -107,7 +107,7 @@ function findLevel(id) {
   }
   return null;
 }
-const levelIcon = (subject, l) => (subject.voice === 'ar' ? `<span class="ar">${l.icon}</span>` : l.icon);
+const levelIcon = (subject, l) => (subject.arabic ? `<span class="ar">${l.icon}</span>` : l.icon);
 
 // Practice medals, best first, shown under the avatar.
 function medalShelf() {
@@ -181,7 +181,7 @@ function subjectScreen() {
     const coinTag = pays ? `<span class="tag coin">🪙 ${pays}</span>` : '';
     return `<li><button class="level ${locked ? 'locked' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
-      <span class="lvl-title">${s.voice === 'ar' ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${coinTag} ${toward}</span>
+      <span class="lvl-title">${s.arabic ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${coinTag} ${toward}</span>
       <span class="stars">${medalCount(r?.rounds) ? `<span class="lvl-medal">${MEDALS[medalCount(r.rounds) - 1]}</span>` : ''}${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
@@ -198,12 +198,20 @@ function questionScreen() {
     <div class="question">
       ${q.visual ? `<div class="visual">${q.visual}</div>` : ''}
       ${q.text ? `<div class="qtext">${q.text}</div>` : ''}
-      <button class="speak ${q.sound ? 'listen' : ''}" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
+      ${q.read ? `<div class="read ar">${q.read}</div>` : ''}
+      <button class="speak" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
     </div>
-    ${view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''} ${q.stack ? 'stack' : ''}">
+    ${q.read ? checker() : view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''} ${q.stack ? 'stack' : ''}">
       ${q.choices.map((c, k) => `<button class="choice" data-act="answer" data-arg="${k}">${c.label}</button>`).join('')}
     </div>`}`;
 }
+
+// Read-aloud questions (Iqra): a grown-up listens and marks it.
+const checker = () => `<div class="checker">
+    <p>${tr('Grown-up: did he read it right?', 'Orang dewasa: betulkah bacaannya?')}</p>
+    <button class="check no" data-act="check" data-arg="0">✗ ${tr('Try again', 'Cuba lagi')}</button>
+    <button class="check yes" data-act="check" data-arg="1">✓ ${tr('Right', 'Betul')}</button>
+  </div>`;
 
 const keypad = () => `<div class="typed">${view.typed || '?'}</div>
   <div class="keypad">
@@ -391,11 +399,8 @@ const currentLang = () => {
   const s = subjectById(view.subjectId);
   return questionLang(state, s.levels[view.levelIdx].id, s.mandarin);
 };
-// The prompt, then (Iqra) the sound itself, slower, in the subject's voice.
 function sayQuestion() {
-  const q = currentQ();
-  say(q.prompt[currentLang()], currentLang());
-  if (q.sound && state.settings.voice) speak(q.sound, VOICE[subjectById(view.subjectId).voice], { queue: true, rate: 0.7 });
+  say(currentQ().prompt[currentLang()], currentLang());
 }
 
 // Mandarin shows characters, pinyin, and an English subtitle.
@@ -607,6 +612,7 @@ const ACTIONS = {
     if (r) startRound(r.subjectId, r.levelIdx);
   },
   answer: (k, el) => answer(Number(k), el),
+  check: (k, el) => { if (view.busy) return; if (k === '1') markRight(el); else markWrong(); },
   key: (d) => typeKey(d),
   del: () => typeDelete(),
   enter: () => typeEnter(),
