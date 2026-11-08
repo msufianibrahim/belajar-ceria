@@ -45,6 +45,16 @@ export function isOpen(state, subject, i) {
   return i <= topIndex(state, subject) || Boolean(needs && state.levels[needs]?.cleared);
 }
 
+// "His level" for daily practice, picked automatically: the two furthest open levels
+// on the main path that aren't mastered yet. Main path = levels the placement quiz
+// probes, or that follow on from another (`needs`); side games (bonds, counting back) are left out.
+export function autoPractice(state, subject, count = 2) {
+  return subject.levels
+    .filter((l, i) => isOpen(state, subject, i) && !state.levels[l.id]?.mastered && (l.probe !== false || l.needs))
+    .slice(-count)
+    .map((l) => l.id);
+}
+
 // Open every level up to index i (never closes levels).
 export function openUpTo(state, subject, i) {
   const target = Math.min(i, subject.levels.length - 1);

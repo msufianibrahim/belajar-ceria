@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { migrate, topIndex, isOpen, openUpTo, pickReview } from '../js/progress.js';
+import { migrate, topIndex, isOpen, openUpTo, pickReview, autoPractice } from '../js/progress.js';
 import { fromJson } from '../js/storage.js';
 import math from '../js/subjects/math.js';
 
@@ -114,4 +114,14 @@ test('old 5-question best scores are doubled once for 10-question rounds', () =>
   const s = fromJson({ levels: { a: { best: 4, cleared: true, perfectDays: [], mastered: false } } });
   assert.equal(s.levels.a.best, 8);
   assert.equal(fromJson(JSON.parse(JSON.stringify(s))).levels.a.best, 8);
+});
+
+test('auto practice: the two furthest open main-path levels not yet mastered, never side games', () => {
+  const passed = { best: 10, of: 10, cleared: true, perfectDays: [], mastered: false };
+  const s = fromJson({ frontier: { math: 'math-sub10' }, levels: { 'math-add10': passed, 'math-sub10': passed } });
+  assert.deepEqual(autoPractice(s, math), ['math-col-add', 'math-col-sub']);
+  s.levels['math-col-sub'] = { ...passed, mastered: true };
+  assert.deepEqual(autoPractice(s, math), ['math-col-add', 'math-col-sub-borrow']);
+  const early = fromJson({ frontier: { math: 'math-bond5' } });
+  assert.ok(!autoPractice(early, math).includes('math-bond5'));
 });

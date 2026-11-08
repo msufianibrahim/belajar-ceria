@@ -3,7 +3,9 @@ import { test, expect } from '@playwright/test';
 const KEY = 'belajar-ceria-v1';
 
 // Open the app with a fresh (or seeded) save. `?test` turns on window.__test.
-async function open(page, seed) {
+// "Practice first" and automatic practice topics are off unless a test turns them on.
+async function open(page, seed = {}) {
+  seed = { ...seed, settings: { practiceFirst: false, practiceAuto: false, ...seed.settings } };
   await page.goto('/?test');
   if (seed) {
     await page.evaluate(([k, s]) => localStorage.setItem(k, JSON.stringify(s)), [KEY, seed]);
@@ -438,4 +440,24 @@ test('column sums can use the number pad instead (parent setting)', async ({ pag
   await expect(page.locator('.colsum')).toBeVisible();
   for (let i = 0; i < 10; i++) await answerRight(page);
   await expect(page.locator('.results h1')).toContainText('Amazing! All correct!');
+});
+
+test('practice first: other Maths levels wait until today\'s practice is done; topics are picked automatically', async ({ page }) => {
+  const passed = { best: 10, of: 10, cleared: true, perfectDays: [], mastered: false };
+  await open(page, { placed: { math: true }, frontier: { math: 'math-sub10' }, settings: { columnInput: 'pad', practiceFirst: true, practiceAuto: true }, levels: { 'math-add10': passed, 'math-sub10': passed } });
+  await expect(page.locator('.big-btn.practice')).toContainText('Column add');
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await expect(page.locator('.gate-note')).toBeVisible();
+  await expect(levelButton(page, 'Count 1–5')).toBeDisabled();
+  await expect(levelButton(page, 'Column subtract').first()).toBeEnabled();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  for (let r = 0; r < 2; r++) {
+    await page.locator('.big-btn.practice').click();
+    for (let i = 0; i < 10; i++) await answerRight(page);
+    await page.getByRole('button', { name: /Next/ }).click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+  }
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await expect(page.locator('.gate-note')).toHaveCount(0);
+  await expect(levelButton(page, 'Count 1–5')).toBeEnabled();
 });

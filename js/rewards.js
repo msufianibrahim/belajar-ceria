@@ -27,7 +27,8 @@ export const passMark = (total) => Math.ceil(total * 0.8); // 8 of 10
 export const masteryMark = (total) => total - Math.floor(total / 10); // 9 of 10: one slip allowed
 
 // `typed`: answered on the number pad. On typed levels only typed rounds count toward mastery.
-export function settleRound(state, level, score, total, today, { typed = false } = {}) {
+// `practice`: this round is daily practice (default: the level is one of the parent's picks).
+export function settleRound(state, level, score, total, today, { typed = false, practice } = {}) {
   const rec = (state.levels[level.id] ??= { best: 0, of: ROUND, cleared: false, perfectDays: [], mastered: false });
   const res = {
     score,
@@ -47,7 +48,7 @@ export function settleRound(state, level, score, total, today, { typed = false }
   rec.rounds = (rec.rounds ?? 0) + 1;
   if (medalCount(rec.rounds) > before) res.medal = MEDALS[medalCount(rec.rounds) - 1];
 
-  if (state.settings?.practice?.includes(level.id)) {
+  if (practice ?? state.settings?.practice?.includes(level.id)) {
     if (state.practiceDay?.date !== today) state.practiceDay = { date: today, rounds: 0, paid: false };
     const day = state.practiceDay;
     day.rounds++;

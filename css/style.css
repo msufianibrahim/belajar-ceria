@@ -228,3 +228,6 @@ button:disabled { cursor: default; }
 .pad.ans { height: 150px; background: #fff8e7; border: 3px dashed #d9c9a8; }
 .box small { display: block; font-size: 1.2rem; height: 1.5rem; color: #0008; font-weight: 600; }
 .board-btns { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-top: 16px; }
+.gate-note { background: #fff3c4; border-radius: var(--radius); padding: 12px 16px; margin: 0 0 12px; font-weight: 700; text-align: center; }
+.level.today { outline: 4px solid #ffb74d; }
+.level.waiting { opacity: .45; }

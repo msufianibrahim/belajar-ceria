@@ -14,7 +14,7 @@ const defaults = () => ({
   placed: {},                   // subjectId -> true once placement is done
   // lang: app + question language ('en' | 'ms'); mandarin: 'off' | 'mastered' | 'all' (see lang.js)
   // practice: level ids the parent picked for daily practice (see rewards.js)
-  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, lang: 'en', mandarin: 'mastered', practice: [], practiceRounds: 2, columnInput: 'write' },
+  settings: { sessionMinutes: 20, restMinutes: 60, voice: true, lang: 'en', mandarin: 'mastered', practice: [], practiceRounds: 2, practiceAuto: true, practiceFirst: true, columnInput: 'write' },
   practiceDay: { date: '', rounds: 0, paid: false },
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
 });

@@ -2,7 +2,7 @@ import { load, save, fromJson, requestPersist, todayKey } from './storage.js';
 import { speak, chime } from './audio.js';
 import { settleRound, ROUND, masteryMark, MASTERY_DAYS, MEDALS, MEDAL_ROUNDS, medalCount, PRACTICE_CHOICES, practicePlan, COINS } from './rewards.js';
 import { mustRest as mustRestFor, addPlayTime, endRest } from './session.js';
-import { topIndex, isOpen, openUpTo, pickReview, answerMode } from './progress.js';
+import { topIndex, isOpen, openUpTo, pickReview, answerMode, autoPractice } from './progress.js';
 import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
@@ -121,9 +121,14 @@ function medalShelf() {
     `<span class="medal">${MEDALS[n - 1]} ${levelIcon(subject, l)} <small>${N(l.title)}</small></span>`).join('')}</div>`;
 }
 
-// Today's practice: the parent's topics; the one with fewer rounds today comes next.
+// Practice topics: picked automatically from his Maths progress, or by the parent.
+const practiceIds = () => (state.settings.practiceAuto !== false
+  ? autoPractice(state, subjectById('math'))
+  : state.settings.practice ?? []);
+
+// Today's practice; the topics take turns.
 function practiceToday() {
-  const picks = (state.settings.practice ?? []).map(findLevel).filter(Boolean);
+  const picks = practiceIds().map(findLevel).filter(Boolean);
   if (!picks.length) return null;
   const day = state.practiceDay?.date === todayKey() ? state.practiceDay : { rounds: 0, paid: false };
   return { picks, next: picks[day.rounds % picks.length], rounds: Math.min(day.rounds, practicePlan(state).rounds), paid: day.paid };
@@ -169,24 +174,35 @@ function homeScreen() {
     </nav>`;
 }
 
+// "Practice first": until today's practice is done, only its topics are playable in that subject.
+function practiceGate(subjectId) {
+  if (state.settings.practiceFirst === false) return null;
+  const p = practiceToday();
+  if (!p || p.paid || !p.picks.some((x) => x.subject.id === subjectId)) return null;
+  return new Set(p.picks.map((x) => x.level.id));
+}
+
 function subjectScreen() {
   const s = subjectById(view.subjectId);
+  const gate = practiceGate(s.id);
   const items = s.levels.map((l, i) => {
     const r = state.levels[l.id];
-    const locked = !isOpen(state, s, i);
-    const badge = locked ? '🔒' : r?.mastered ? '👑' : i + 1;
+    const waiting = gate && isOpen(state, s, i) && !gate.has(l.id);
+    const locked = !isOpen(state, s, i) || waiting;
+    const badge = waiting ? '🎯' : locked ? '🔒' : r?.mastered ? '👑' : i + 1;
     const zh = !locked && questionLang(state, l.id, s.mandarin) === 'zh' ? '<span class="tag">华文</span>' : '';
     const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS} → 🪙 ${COINS.mastery}</span>` : '';
     // What this level can still pay, so he knows where the coins are.
     const pays = locked || r?.mastered ? 0 : !r?.cleared ? COINS.firstClear : r.best < ROUND ? COINS.newBest : 0;
     const coinTag = pays ? `<span class="tag coin">🪙 ${pays}</span>` : '';
-    return `<li><button class="level ${locked ? 'locked' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
+    return `<li><button class="level ${locked ? 'locked' : ''} ${waiting ? 'waiting' : ''} ${gate?.has(l.id) ? 'today' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
       <span class="lvl-title">${s.arabic ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${coinTag} ${toward}</span>
       <span class="stars">${medalCount(r?.rounds) ? `<span class="lvl-medal">${MEDALS[medalCount(r.rounds) - 1]}</span>` : ''}${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
-  return `${topBar(`${s.icon} ${N(s.name)}`)}<ol class="path">${items}</ol>`;
+  const note = gate ? `<p class="gate-note">🎯 ${tr("Do today's practice first, then you can play any level!", 'Buat latihan hari ini dulu, lepas tu boleh main mana-mana tahap!')}</p>` : '';
+  return `${topBar(`${s.icon} ${N(s.name)}`)}${note}<ol class="path">${items}</ol>`;
 }
 
 function questionScreen() {
@@ -398,13 +414,20 @@ function parentScreen() {
     </section>
     <section class="panel"><h3>${tr('Daily practice', 'Latihan harian')}</h3>
       <p class="muted">${tr('Topics to drill. Coins once a day for finishing, whatever the score.', 'Topik untuk diulang. Syiling sekali sehari bila siap, walau apa pun markahnya.')}</p>
+      <label>${tr('Topics', 'Topik')} <select data-setting="practiceAuto" data-kind="bool">
+        <option value="1" ${state.settings.practiceAuto !== false ? 'selected' : ''}>${tr('Automatic: his Maths level', 'Automatik: tahap Matematiknya')}</option>
+        <option value="0" ${state.settings.practiceAuto === false ? 'selected' : ''}>${tr('I choose', 'Saya pilih')}</option>
+      </select></label>
+      ${state.settings.practiceAuto !== false ? `<p class="muted">${tr('Now', 'Sekarang')}: ${practiceIds().map(findLevel).filter(Boolean).map(({ level }) => N(level.title)).join(' · ') || '—'}</p>` : ''}
+      <label>${tr('Practice first', 'Latihan dulu')} <input type="checkbox" data-setting="practiceFirst" ${state.settings.practiceFirst !== false ? 'checked' : ''}></label>
+      <p class="muted">${tr('Other levels in that subject open after today’s practice.', 'Tahap lain dalam subjek itu dibuka selepas latihan hari ini.')}</p>
       <label>${tr('Length', 'Panjang')} <select data-practice-rounds>${PRACTICE_CHOICES.map((n) =>
         `<option value="${n}" ${practicePlan(state).rounds === n ? 'selected' : ''}>${tr(`${n} rounds (${n * ROUND} questions) = 🪙 ${n * COINS.practice}`, `${n} pusingan (${n * ROUND} soalan) = 🪙 ${n * COINS.practice}`)}</option>`).join('')}</select></label>
-      ${[0, 1].map((k) => `<label>${tr('Topic', 'Topik')} ${k + 1} <select data-practice="${k}">
+      ${state.settings.practiceAuto === false ? [0, 1].map((k) => `<label>${tr('Topic', 'Topik')} ${k + 1} <select data-practice="${k}">
         <option value="">—</option>
         ${SUBJECTS.filter((sub) => sub.levels.length).map((sub) => `<optgroup label="${esc(L(state, sub.name))}">${sub.levels.map((l) =>
           `<option value="${l.id}" ${state.settings.practice?.[k] === l.id ? 'selected' : ''}>${N(l.title)}</option>`).join('')}</optgroup>`).join('')}
-      </select></label>`).join('')}
+      </select></label>`).join('') : ''}
     </section>
     <section class="panel"><h3>${tr('Real-world rewards', 'Hadiah dunia sebenar')}</h3>
       <p class="muted">${tr('Give a sticker when your child does these with you.', 'Beri pelekat bila anak buat aktiviti ini bersama anda.')}</p>${tasks}
@@ -438,7 +461,7 @@ function promptHtml(p, lang) {
 function startRound(subjectId, levelIdx) {
   const level = subjectById(subjectId).levels[levelIdx];
   const ok = go('play', {
-    subjectId, levelIdx, qs: makeRound(level.gen, ROUND), i: 0, score: 0, retries: 0, missed: false, busy: false,
+    subjectId, levelIdx, practice: practiceIds().includes(level.id), qs: makeRound(level.gen, ROUND), i: 0, score: 0, retries: 0, missed: false, busy: false,
     mode: answerMode(state, level), typed: '',
   });
   if (ok) sayQuestion();
@@ -650,7 +673,7 @@ app.addEventListener('pointercancel', padEnd);
 function finishRound() {
   const s = subjectById(view.subjectId);
   const level = s.levels[view.levelIdx];
-  const res = settleRound(state, level, view.score, view.qs.length, todayKey(), { typed: view.mode === 'type' });
+  const res = settleRound(state, level, view.score, view.qs.length, todayKey(), { typed: view.mode === 'type', practice: view.practice });
   if (res.passed) openUpTo(state, s, view.levelIdx + 1);
   persist();
   go('results', { subjectId: s.id, levelIdx: view.levelIdx, levelId: level.id, res, retries: view.retries });
@@ -786,9 +809,9 @@ app.addEventListener('submit', (e) => {
 app.addEventListener('change', (e) => {
   const t = e.target;
   if (t.dataset.setting) {
-    state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : t.dataset.kind === 'text' ? t.value : Number(t.value);
+    state.settings[t.dataset.setting] = t.type === 'checkbox' ? t.checked : t.dataset.kind === 'text' ? t.value : t.dataset.kind === 'bool' ? t.value === '1' : Number(t.value);
     persist();
-    if (t.dataset.setting === 'lang') render();
+    if (['lang', 'practiceAuto'].includes(t.dataset.setting)) render();
   } else if (t.dataset.practiceRounds !== undefined) {
     state.settings.practiceRounds = Number(t.value);
     persist();
