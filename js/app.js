@@ -146,6 +146,13 @@ function practiceCard() {
   </button>`;
 }
 
+function continueCard() {
+  const c = lastPaused();
+  if (!c) return '';
+  return `<button class="big-btn continue" data-act="resume">▶️ ${tr('Continue', 'Sambung')}: ${levelIcon(c.subject, c.level)} ${N(c.level.title)}
+    <small>${c.p.i}/${c.p.qs.length}</small></button>`;
+}
+
 // Always 5 stars, so a 10-question round shows 9/10 as ★★★★☆.
 const stars = (n, total) => {
   const k = Math.floor((n * 5) / total);
@@ -165,6 +172,7 @@ function homeScreen() {
       <button class="icon-btn parent-btn" data-act="gate" aria-label="${tr('Parents', 'Ibu bapa')}">⚙️</button>
     </header>
     <section class="hero">${avatar()}${medalShelf()}<h1>Assalamualaikum${name}!</h1></section>
+    ${continueCard()}
     ${practiceCard()}
     <section class="subjects">${tiles}</section>
     ${pickReview(state, SUBJECTS, todayKey()) ? `<button class="big-btn review" data-act="review">🔁 ${tr('Review', 'Ulang kaji')} <small>— 👑 = 🪙 ${COINS.mastery}</small></button>` : ''}
@@ -195,9 +203,11 @@ function subjectScreen() {
     // What this level can still pay, so he knows where the coins are.
     const pays = locked || r?.mastered ? 0 : !r?.cleared ? COINS.firstClear : r.best < ROUND ? COINS.newBest : 0;
     const coinTag = pays ? `<span class="tag coin">🪙 ${pays}</span>` : '';
+    const paused = state.paused?.[l.id];
+    const pausedTag = paused && !locked ? `<span class="tag">▶️ ${paused.i}/${paused.qs.length}</span>` : '';
     return `<li><button class="level ${locked ? 'locked' : ''} ${waiting ? 'waiting' : ''} ${gate?.has(l.id) ? 'today' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
-      <span class="lvl-title">${s.arabic ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${coinTag} ${toward}</span>
+      <span class="lvl-title">${s.arabic ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${pausedTag} ${coinTag} ${toward}</span>
       <span class="stars">${medalCount(r?.rounds) ? `<span class="lvl-medal">${MEDALS[medalCount(r.rounds) - 1]}</span>` : ''}${stars(r?.best ?? 0, ROUND)}</span>
     </button></li>`;
   }).join('');
@@ -460,13 +470,37 @@ function promptHtml(p, lang) {
   return `<span class="zh">${esc(p.zh)}</span><span class="py">${esc(p.py)}</span><span class="sub">${esc(p.en)}</span>`;
 }
 
+// A round he stopped halfway (or the rest timer stopped) carries on where it left off.
 function startRound(subjectId, levelIdx) {
   const level = subjectById(subjectId).levels[levelIdx];
-  const ok = go('play', {
-    subjectId, levelIdx, practice: practiceIds().includes(level.id), qs: makeRound(level.gen, ROUND), i: 0, score: 0, retries: 0, missed: false, busy: false,
-    mode: answerMode(state, level), typed: '',
-  });
+  const saved = state.paused?.[level.id];
+  const round = saved
+    ? { qs: saved.qs, i: saved.i, score: saved.score, retries: saved.retries, missed: saved.missed, mode: saved.mode, practice: saved.practice }
+    : { qs: makeRound(level.gen, ROUND), i: 0, score: 0, retries: 0, missed: false, mode: answerMode(state, level), practice: practiceIds().includes(level.id) };
+  const ok = go('play', { subjectId, levelIdx, ...round, busy: false, typed: '' });
   if (ok) sayQuestion();
+}
+
+// Saved after every answer, so quitting never loses a round (a wrong answer stays wrong).
+function saveRound() {
+  const v = view;
+  const id = subjectById(v.subjectId).levels[v.levelIdx].id;
+  state.paused ??= {};
+  if (v.i === 0 && !v.missed) delete state.paused[id];
+  else state.paused[id] = { qs: v.qs, i: v.i, score: v.score, retries: v.retries, missed: v.missed, mode: v.mode, practice: v.practice, ts: Date.now() };
+  persist();
+}
+
+// The round stopped most recently, for the Continue button on home.
+function lastPaused() {
+  let best = null;
+  for (const [id, p] of Object.entries(state.paused ?? {})) {
+    const found = findLevel(id);
+    const gate = found && practiceGate(found.subject.id);
+    if (gate && !gate.has(id)) continue; // practice first still applies
+    if (found && (!best || p.ts > best.p.ts)) best = { ...found, p };
+  }
+  return best;
 }
 
 // Placement feels like a normal game: no right/wrong feedback, it just climbs the
@@ -511,6 +545,7 @@ function placementAnswer(right, el) {
 function markWrong() {
   view.missed = true;
   view.retries++;
+  if (view.name === 'play') saveRound();
   chime('wrong');
   say(RETRY[currentLang()], currentLang());
 }
@@ -528,7 +563,7 @@ function markRight(el) {
     v.missed = false;
     v.busy = false;
     v.typed = '';
-    if (v.i < v.qs.length) { render(); sayQuestion(); } else finishRound();
+    if (v.i < v.qs.length) { saveRound(); render(); sayQuestion(); } else finishRound();
   }, 1000);
 }
 
@@ -676,6 +711,7 @@ app.addEventListener('pointercancel', padEnd);
 function finishRound() {
   const s = subjectById(view.subjectId);
   const level = s.levels[view.levelIdx];
+  delete state.paused?.[level.id];
   const res = settleRound(state, level, view.score, view.qs.length, todayKey(), { typed: view.mode === 'type', practice: view.practice });
   if (res.passed) openUpTo(state, s, view.levelIdx + 1);
   persist();
@@ -757,6 +793,10 @@ const ACTIONS = {
     return state.placed[id] ? go('subject', { subjectId: id }) : startPlacement(id);
   },
   play: (i) => startRound(view.subjectId, Number(i)),
+  resume: () => {
+    const c = lastPaused();
+    if (c) startRound(c.subject.id, c.idx);
+  },
   practice: () => {
     const p = practiceToday();
     if (p) startRound(p.next.subject.id, p.next.idx);

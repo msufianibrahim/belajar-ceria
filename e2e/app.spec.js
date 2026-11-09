@@ -470,3 +470,23 @@ test('practice first: other Maths levels wait until today\'s practice is done; t
   await expect(page.locator('.gate-note')).toHaveCount(0);
   await expect(levelButton(page, 'Count 1–5')).toBeEnabled();
 });
+
+test('stopping halfway saves the round: Continue picks up at the same question, a miss still counts', async ({ page }) => {
+  await open(page, placed);
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await levelButton(page, 'Count 1–5').click();
+  for (let i = 0; i < 3; i++) await answerRight(page);
+  await answerWrong(page);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(levelButton(page, 'Count 1–5')).toContainText('▶️ 3/10');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('.big-btn.continue')).toContainText('Count 1–5');
+  await page.locator('.big-btn.continue').click();
+  await expect(page.locator('.dots .done')).toHaveCount(3);
+  for (let i = 0; i < 7; i++) await answerRight(page);
+  await expect(page.locator('.results h1')).toContainText('Well done!');
+  await page.getByRole('button', { name: /Next/ }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.locator('.big-btn.continue')).toHaveCount(0);
+});
