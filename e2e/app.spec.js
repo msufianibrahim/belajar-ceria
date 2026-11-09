@@ -419,6 +419,15 @@ test('column add: he writes the answer digits on the whiteboard; a wrong one is 
   await page.getByRole('button', { name: /Maths/ }).click();
   await levelButton(page, 'Column add').first().click();
   await expect(page.locator('.colsum canvas.ans')).toHaveCount(2);
+  // Strike through the top number: scribbles on the sum are never read as the answer.
+  const top = await page.locator('.colsum > span').nth(2).boundingBox();
+  await page.mouse.move(top.x - 10, top.y + top.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(top.x + top.width + 10, top.y + top.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(600);
+  await expect(page.locator('[data-read="t"]')).toHaveText('');
+  await expect(page.locator('[data-read="o"]')).toHaveText('');
   const answer = await page.evaluate(() => window.__test.answer());
   const wrong = (answer + 1) % 10 === answer % 10 ? answer : (answer % 10 + 1) % 10;
   await drawDigit(page, 'o', wrong);

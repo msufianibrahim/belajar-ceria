@@ -225,17 +225,19 @@ function questionScreen() {
 }
 
 // Column sum set out like school: digits in tens/ones columns. With `write`, he writes
-// the answer digits on whiteboard boxes (and carries on the scratch strip above).
+// the answer digits in whiteboard boxes, and can scribble anywhere on the sum (strike out
+// a digit to borrow, write a carry above): that layer is never read.
 function columnSum({ a, b, op }, write) {
   const digits = (n) => [n >= 10 ? Math.floor(n / 10) : '', n % 10].map((d) => `<span>${d}</span>`).join('');
   return `<div class="colsum">
-    ${write ? '<span></span><canvas class="pad scratch" aria-label="scratch"></canvas>' : ''}
+    ${write ? '<span class="carry-row"></span>' : ''}
     <span></span>${digits(a)}
     <span class="op">${op === '-' ? '−' : '+'}</span>${digits(b)}
     <span class="rule"></span>
     ${write ? `<span></span>
       <div class="box"><canvas class="pad ans" data-col="t"></canvas><small data-read="t"></small></div>
-      <div class="box"><canvas class="pad ans" data-col="o"></canvas><small data-read="o"></small></div>` : ''}
+      <div class="box"><canvas class="pad ans" data-col="o"></canvas><small data-read="o"></small></div>
+      <canvas class="pad scratch" aria-label="scribble"></canvas>` : ''}
   </div>`;
 }
 
@@ -590,12 +592,13 @@ function padStart(e) {
   stroke = { c, pts: [p] };
   c.strokes.push(stroke.pts);
   const ctx = c.getContext('2d');
-  ctx.lineWidth = c.classList.contains('scratch') ? 4 : 7;
+  const ink = c.classList.contains('scratch') ? '#1e88e5' : '#3b2f2f';
+  ctx.lineWidth = c.classList.contains('scratch') ? 5 : 7;
   ctx.lineCap = ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#3b2f2f';
+  ctx.strokeStyle = ink;
   ctx.beginPath();
   ctx.arc(p[0], p[1], ctx.lineWidth / 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#3b2f2f';
+  ctx.fillStyle = ink;
   ctx.fill();
 }
 

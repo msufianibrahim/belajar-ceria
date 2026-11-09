@@ -224,7 +224,10 @@ button:disabled { cursor: default; }
 .colsum.wrong { animation: shake .4s; }
 .colsum.right .ans { background: #d6f5db; }
 .pad { touch-action: none; display: block; width: 100%; border-radius: 14px; }
-.pad.scratch { grid-column: 2 / 4; height: 64px; background: repeating-linear-gradient(90deg, #fff8e7 0 118px, #f0e6d2 118px 128px); }
+.colsum { position: relative; }
+.colsum .carry-row { grid-column: 2 / 4; height: 56px; border-bottom: 2px dashed #f0e6d2; }
+.pad.scratch { position: absolute; inset: -10px; width: calc(100% + 20px); height: calc(100% + 20px); background: transparent; border-radius: 0; z-index: 1; }
+.colsum .box { position: relative; z-index: 2; }
 .pad.ans { height: 150px; background: #fff8e7; border: 3px dashed #d9c9a8; }
 .box small { display: block; font-size: 1.2rem; height: 1.5rem; color: #0008; font-weight: 600; }
 .board-btns { display: grid; grid-template-columns: 1fr 2fr; gap: 14px; margin-top: 16px; }
