@@ -7,7 +7,7 @@ import { SUBJECTS } from './subjects/index.js';
 import { makeRound, pick } from './subjects/util.js';
 import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
 import { avatarSvg } from './avatar.js';
-import { recognize } from './digits.js';
+import { recognize, toCloud } from './digits.js';
 import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
 
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
@@ -245,13 +245,17 @@ function columnSum({ a, b, op }, write) {
     <span class="op">${op === '-' ? '−' : '+'}</span>${digits(b)}
     <span class="rule"></span>
     ${write ? `<span></span>
-      <div class="box"><canvas class="pad ans" data-col="t"></canvas><small data-read="t"></small></div>
-      <div class="box"><canvas class="pad ans" data-col="o"></canvas><small data-read="o"></small></div>
+      ${['t', 'o'].map((col) => `<div class="box"><canvas class="pad ans" data-col="${col}"></canvas>
+        <div class="box-tools"><button class="box-btn" data-act="wipe-box" data-arg="${col}" aria-label="${tr('Clear box', 'Padam kotak')}">🧽</button><button class="box-btn read-fix" data-act="fix" data-arg="${col}" data-read="${col}" aria-label="${tr('Fix this number', 'Betulkan nombor ini')}">🔢</button></div></div>`).join('')}
       <canvas class="pad scratch" aria-label="scribble"></canvas>` : ''}
   </div>`;
 }
 
-const boardButtons = () => `<div class="board-btns">
+// The fix pad sets one box's number when the app read his writing wrong (tap the number under a box).
+const boardButtons = () => `<div class="fixpad" hidden>
+    ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 0].map((d) => `<button class="key" data-act="fix-digit" data-arg="${d}">${d}</button>`).join('')}
+  </div>
+  <div class="board-btns">
     <button class="key del" data-act="wipe">🧽 ${tr('Clear', 'Padam')}</button>
     <button class="key ok" data-act="check-written" aria-label="${tr('Check', 'Semak')}">✓</button>
   </div>`;
@@ -626,6 +630,7 @@ function padStart(e) {
     c.strokes = [];
   }
   c.setPointerCapture?.(e.pointerId);
+  delete c.fixed; // writing again replaces a number set on the fix pad
   const p = padPoint(c, e);
   stroke = { c, pts: [p] };
   c.strokes.push(stroke.pts);
@@ -670,7 +675,7 @@ function readBoxes() {
   const out = {};
   for (const c of app.querySelectorAll('canvas.ans')) {
     const strokes = c.strokes ?? [];
-    out[c.dataset.col] = strokes.length ? (recognize(strokes)?.digit ?? '?') : '';
+    out[c.dataset.col] = c.fixed ?? (strokes.length ? (recognize(strokes, state.ink)?.digit ?? '?') : '');
   }
   return out;
 }
@@ -679,7 +684,9 @@ function showReads() {
   const reads = readBoxes();
   for (const [col, v] of Object.entries(reads)) {
     const el = app.querySelector(`[data-read="${col}"]`);
-    if (el) el.textContent = v === '' ? '' : String(v);
+    if (!el) continue;
+    el.textContent = v === '' ? '🔢' : String(v);
+    el.classList.toggle('fixed', app.querySelector(`canvas.ans[data-col="${col}"]`).fixed !== undefined);
   }
 }
 
@@ -687,8 +694,39 @@ function clearPads(selector) {
   for (const c of app.querySelectorAll(selector)) {
     c.getContext('2d').clearRect(0, 0, c.width, c.height);
     c.strokes = c.strokes && [];
+    delete c.fixed;
   }
+  showFix(null);
   showReads();
+}
+
+// Fix pad: tap the number under a box, then the right digit; only that box changes.
+let fixCol = null;
+function showFix(col) {
+  fixCol = col;
+  const pad = app.querySelector('.fixpad');
+  if (pad) pad.hidden = col === null;
+  for (const b of app.querySelectorAll('.read-fix')) b.classList.toggle('fixing', b.dataset.arg === col);
+}
+
+function fixDigit(d) {
+  const c = app.querySelector(`canvas.ans[data-col="${fixCol}"]`);
+  if (!c || view.busy) return;
+  c.fixed = Number(d);
+  showFix(null);
+  showReads();
+}
+
+// After a right answer the digits are known, so his writing becomes a template (newest 5 per digit).
+const INK_PER_DIGIT = 5;
+function learnInk(answer) {
+  const truth = { t: answer >= 10 ? Math.floor(answer / 10) : null, o: answer % 10 };
+  for (const c of app.querySelectorAll('canvas.ans')) {
+    const d = truth[c.dataset.col];
+    if (d === null || !c.strokes?.length) continue;
+    state.ink ??= {};
+    state.ink[d] = [...(state.ink[d] ?? []), toCloud(c.strokes)].slice(-INK_PER_DIGIT);
+  }
 }
 
 function checkWritten() {
@@ -698,7 +736,10 @@ function checkWritten() {
   if (t === '?' || o === '?') return say(tr("I can't read that. Write it again.", 'Tak dapat baca. Tulis sekali lagi.'));
   const value = (t === '' ? 0 : t) * 10 + o;
   const board = app.querySelector('.colsum');
-  if (value === currentQ().answer) return markRight(board);
+  if (value === currentQ().answer) {
+    learnInk(value);
+    return markRight(board);
+  }
   clearPads('canvas.ans');
   board.classList.remove('wrong');
   void board.offsetWidth;
@@ -810,6 +851,9 @@ const ACTIONS = {
   },
   answer: (k, el) => answer(Number(k), el),
   wipe: () => clearPads('canvas.pad'),
+  'wipe-box': (col) => clearPads(`canvas.ans[data-col="${col}"]`),
+  fix: (col) => showFix(fixCol === col ? null : col),
+  'fix-digit': (d) => fixDigit(d),
   'check-written': () => checkWritten(),
   check: (k, el) => { if (view.busy) return; if (k === '1') markRight(el); else markWrong(); },
   key: (d) => typeKey(d),

@@ -120,12 +120,17 @@ const CLOUDS = Object.entries(TEMPLATES).flatMap(([digit, variants]) => variants
 // Below this a scribble is too far from every digit to guess.
 const MAX_DISTANCE = 2;
 
-// strokes: [[[x, y], ...], ...] in any units. Returns { digit, distance } or null when unsure.
-export function recognize(strokes) {
+// His own writing, saved after right answers, as compact templates: [[x, y], ...] (see app.js learnInk).
+export const toCloud = (strokes) => normalize(strokes).map((p) => [Math.round(p.x * 1000) / 1000, Math.round(p.y * 1000) / 1000]);
+
+// strokes: [[[x, y], ...], ...] in any units. ink: { digit: [cloud, ...] } learnt from this child.
+// Returns { digit, distance } or null when unsure.
+export function recognize(strokes, ink = {}) {
   if (!strokes.some((s) => s.length > 1 || strokes.length > 1)) return null;
   const cloud = normalize(strokes);
+  const own = Object.entries(ink).flatMap(([digit, clouds]) => clouds.map((c) => ({ digit: Number(digit), cloud: c.map(([x, y]) => ({ x, y })) })));
   let best = null;
-  for (const t of CLOUDS) {
+  for (const t of [...CLOUDS, ...own]) {
     const d = greedyMatch(cloud, t.cloud);
     if (!best || d < best.distance) best = { digit: t.digit, distance: d };
   }

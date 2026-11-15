@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recognize, _templates } from '../js/digits.js';
+import { recognize, toCloud, _templates } from '../js/digits.js';
 
 // Templates redrawn wobbly, slanted and squashed, like a child's writing.
 function distort(strokes, seed) {
@@ -32,4 +32,13 @@ test('reads at least 9 in 10 of wobbly, slanted digits', () => {
 test('an empty box or a single dot is not a digit', () => {
   assert.equal(recognize([]), null);
   assert.equal(recognize([[[5, 5]]]), null);
+});
+
+test('his own writing, once learnt, is read as the digit he meant', () => {
+  // An unusual 4: an open box with a long tail, drawn in one stroke.
+  const odd = [[[20, 0], [20, 50], [80, 50], [80, 0], [80, 100]]];
+  const learnt = { 4: [toCloud(odd)] };
+  assert.equal(recognize(distort(odd, 99), learnt)?.digit, 4);
+  // Learnt templates don't break the standard digits.
+  for (const [d, variants] of Object.entries(_templates)) if (d !== '4') assert.equal(recognize(variants[0], learnt)?.digit, Number(d));
 });

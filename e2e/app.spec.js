@@ -426,14 +426,14 @@ test('column add: he writes the answer digits on the whiteboard; a wrong one is 
   await page.mouse.move(top.x + top.width + 10, top.y + top.height / 2, { steps: 5 });
   await page.mouse.up();
   await page.waitForTimeout(600);
-  await expect(page.locator('[data-read="t"]')).toHaveText('');
-  await expect(page.locator('[data-read="o"]')).toHaveText('');
+  await expect(page.locator('[data-read="t"]')).toHaveText('🔢');
+  await expect(page.locator('[data-read="o"]')).toHaveText('🔢');
   const answer = await page.evaluate(() => window.__test.answer());
   const wrong = (answer + 1) % 10 === answer % 10 ? answer : (answer % 10 + 1) % 10;
   await drawDigit(page, 'o', wrong);
   await expect(page.locator('[data-read="o"]')).toHaveText(String(wrong));
   await page.getByRole('button', { name: 'Check' }).click();
-  await expect(page.locator('[data-read="o"]')).toHaveText('');
+  await expect(page.locator('[data-read="o"]')).toHaveText('🔢');
   if (answer >= 10) await drawDigit(page, 't', Math.floor(answer / 10));
   await drawDigit(page, 'o', answer % 10);
   await expect(page.locator('[data-read="o"]')).toHaveText(String(answer % 10));
@@ -504,4 +504,36 @@ test('Bahasa Melayu: no quiz, starts at level 1; listening hides the answer; rea
   await expect(page.locator('.read')).toHaveCount(1);
   await expect(page.locator('.read.ar')).toHaveCount(0);
   await expect(page.locator('.checker')).toHaveCount(1);
+});
+
+test('whiteboard: clear one box only; fix a misread number on the pad; right answers teach his writing', async ({ page }) => {
+  const passed = { best: 10, of: 10, cleared: true, perfectDays: [], mastered: false };
+  await open(page, { placed: { math: true }, frontier: { math: 'math-add10' }, levels: { 'math-add10': passed } });
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await levelButton(page, 'Column add').first().click();
+  const answer = await page.evaluate(() => window.__test.answer());
+  const other = (answer % 10 + 1) % 10;
+  // Two boxes written; clearing the tens box leaves the ones box alone.
+  await drawDigit(page, 't', 1);
+  await drawDigit(page, 'o', other);
+  await expect(page.locator('[data-read="o"]')).toHaveText(String(other));
+  await page.locator('[data-act="wipe-box"][data-arg="t"]').click();
+  await expect(page.locator('[data-read="t"]')).toHaveText('🔢');
+  await expect(page.locator('[data-read="o"]')).toHaveText(String(other));
+  // The ones box was "misread": fix it on the pad, without changing settings.
+  await expect(page.locator('.fixpad')).toBeHidden();
+  await page.locator('[data-read="o"]').click();
+  await page.locator(`.fixpad [data-arg="${answer % 10}"]`).click();
+  await expect(page.locator('.fixpad')).toBeHidden();
+  await expect(page.locator('[data-read="o"]')).toHaveText(String(answer % 10));
+  if (answer >= 10) {
+    await page.locator('[data-read="t"]').click();
+    await page.locator(`.fixpad [data-arg="${Math.floor(answer / 10)}"]`).click();
+  }
+  await page.getByRole('button', { name: 'Check' }).click();
+  await expect(page.locator('.dots .done')).toHaveCount(1);
+  // His ones-box writing is saved as the right digit.
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  const ink = await page.evaluate(() => JSON.parse(localStorage.getItem('belajar-ceria-v1')).ink);
+  expect(ink[answer % 10]).toHaveLength(1);
 });

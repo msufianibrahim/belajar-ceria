@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
   timeout: 60000, // the long practice test takes ~32s on a slower laptop
+  expect: { timeout: 10000 }, // first page loads are slow there too
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {

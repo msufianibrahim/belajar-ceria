@@ -17,6 +17,7 @@ const defaults = () => ({
   settings: { sessionMinutes: 20, restMinutes: 60, voice: true, lang: 'en', mandarin: 'mastered', practice: [], practiceRounds: 2, practiceAuto: true, practiceFirst: true, columnInput: 'write' },
   practiceDay: { date: '', rounds: 0, paid: false },
   paused: {},                   // levelId -> a round stopped halfway (see app.js saveRound)
+  ink: {},                      // digit -> his own handwriting templates (see app.js learnInk)
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
 });
 
