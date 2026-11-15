@@ -11,6 +11,7 @@ import { recognize, toCloud } from './digits.js';
 import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
 import { tokens, companion, chooseGuesses } from './follow.js';
 import { canListen, listen, LISTEN_LANG } from './listen.js';
+import { readPhoto } from './ocr.js';
 
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
 // Screens where the play clock runs and the rest gate applies.
@@ -453,8 +454,10 @@ function parentScreen() {
     <section class="panel"><h3>📚 ${tr('Reading companion', 'Teman membaca')}</h3>
       <p class="muted">${tr('Add a page from his book. He reads it aloud and the tablet follows along: a missed word turns orange (one more try), then red; only red words can be tapped to hear them. Needs internet; the audio goes to Google or Apple; speech recognition is built for adult voices.', 'Tambah muka surat dari bukunya. Dia baca dengan kuat dan tablet mengikut: perkataan tertinggal jadi jingga (cuba sekali lagi), kemudian merah; hanya perkataan merah boleh ditekan untuk didengar. Perlu internet; audio dihantar ke Google atau Apple; pengecaman suara dibina untuk suara dewasa.')}</p>
       ${state.books.map((b) => `<div class="task"><span>${langTag(b.lang)} ${esc(b.title)}</span><button class="btn danger" data-act="delBook" data-arg="${b.id}">${tr('Delete', 'Padam')}</button></div>`).join('')}
-      <label>${tr('Title', 'Tajuk')} <input id="book-title" maxlength="40"></label>
       <label>${tr('Language', 'Bahasa')} <select id="book-lang">${BOOK_LANGS.map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label>
+      <label class="btn">📷 ${tr('Photo of the page', 'Gambar muka surat')}<input id="book-photo" type="file" accept="image/*" capture="environment" hidden></label>
+      <p class="muted" id="ocr-status">${tr('The words are read on this tablet; check them before adding.', 'Perkataan dibaca dalam tablet ini; semak dulu sebelum tambah.')}</p>
+      <label>${tr('Title', 'Tajuk')} <input id="book-title" maxlength="40" placeholder="${tr('Page', 'Muka surat')} ${state.books.length + 1}"></label>
       <textarea id="book-text" rows="5" maxlength="2000" placeholder="${tr('Type or paste the words on the page', 'Taip atau tampal perkataan pada muka surat')}"></textarea>
       <button class="btn" data-act="addBook">➕ ${tr('Add page', 'Tambah muka surat')}</button>
     </section>
@@ -583,13 +586,31 @@ function finishPage(b, res) {
 }
 
 function addBook() {
-  const title = app.querySelector('#book-title').value.trim().slice(0, 40);
+  const titleEl = app.querySelector('#book-title');
+  const title = (titleEl.value.trim() || titleEl.placeholder).slice(0, 40);
   const lang = app.querySelector('#book-lang').value;
   const text = app.querySelector('#book-text').value.trim().slice(0, 2000);
-  if (!title || !tokens(text, LISTEN_LANG[lang]).length) return alert(tr('Give the page a title and its words.', 'Beri tajuk dan perkataan muka surat.'));
+  if (!tokens(text, LISTEN_LANG[lang]).length) return alert(tr('Add the words on the page first.', 'Masukkan perkataan muka surat dulu.'));
   state.books.push({ id: `b${Date.now()}`, title, lang, text });
   persist();
   render();
+}
+
+// The photo's words go into the text box for the parent to check, not straight into a page.
+async function photoToText(file) {
+  if (!file) return;
+  const status = app.querySelector('#ocr-status');
+  const show = (t) => { if (status) status.textContent = t; };
+  show(tr('Reading the photo…', 'Sedang baca gambar…'));
+  try {
+    const text = await readPhoto(file, app.querySelector('#book-lang').value, (p) => show(`${tr('Reading the photo…', 'Sedang baca gambar…')} ${Math.round(p * 100)}%`));
+    const box = app.querySelector('#book-text');
+    if (!box) return;
+    box.value = text;
+    show(text ? tr('Done. Fix any wrong words, then tap Add page.', 'Siap. Betulkan perkataan yang salah, kemudian tekan Tambah.') : tr('No words found. Try a clearer, closer photo.', 'Tiada perkataan dijumpai. Cuba gambar yang lebih jelas dan dekat.'));
+  } catch {
+    show(tr("Couldn't read the photo. Check the internet (needed the first time) and try again.", 'Tak dapat baca gambar. Semak internet (perlu kali pertama) dan cuba lagi.'));
+  }
 }
 
 // ---------------------------------------------------------------- rounds
@@ -1069,6 +1090,9 @@ app.addEventListener('change', (e) => {
   } else if (t.id === 'child-name') {
     state.childName = t.value.trim().slice(0, 20);
     persist();
+  } else if (t.id === 'book-photo') {
+    photoToText(t.files[0]);
+    t.value = '';
   } else if (t.id === 'import-file') {
     importFile(t.files[0]);
     t.value = '';

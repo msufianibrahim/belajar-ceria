@@ -85,7 +85,9 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
    area; home shows 📚 Read a book when pages exist; reading screen follows `companion()` rules
    in js/follow.js; js/listen.js wraps speech recognition (auto-restarts on Android pauses).
    `state.books`, `state.reads` (last red count). **No coins for reading yet** — reward design
-   says ask first. Next: he tries it on the tablet; later maybe OCR from a photo of the page.
+   says ask first. **Photo of the page** (js/ocr.js): Tesseract.js 5.1.1 from jsDelivr, on-device
+   (msa / eng / chi_sim), fills the text box for the parent to check — user found typing too tedious.
+   Next: he tries it on the tablet.
 2. The rest of Iqra 1–2.
 3. Asas Islam — not started.
 

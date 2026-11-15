@@ -616,3 +616,26 @@ test('reading companion: missed word turns orange, then red if he reads on; only
   expect(reads.b1.red).toBe(1);
   await page.screenshot({ path: 'test-results/reading.png' });
 });
+
+test.describe(() => {
+// The app's service worker would fetch the OCR script itself, out of page.route's reach.
+test.use({ serviceWorkers: 'block' });
+test('a photo of the page fills in its words for the parent to check', async ({ page }) => {
+  // Stand-in for the OCR library from the CDN.
+  const ocrText = JSON.stringify('Bola itu ber-\nwarna merah.');
+  await page.route('**/tesseract.min.js', (r) => r.fulfill({ contentType: 'text/javascript', body: `window.Tesseract = { createWorker: async () => ({
+    recognize: async () => ({ data: { text: ${ocrText} } }), terminate: async () => {} }) };` }));
+  await open(page);
+  await page.getByRole('button', { name: 'Parents' }).click();
+  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
+  await page.locator('.gate input').fill(String(a * b));
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.locator('#book-lang').selectOption('ms');
+  const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 40; return c.toDataURL('image/png').split(',')[1]; }), 'base64');
+  await page.locator('#book-photo').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: png });
+  await expect(page.locator('#book-text')).toHaveValue('Bola itu berwarna merah.');
+  await page.getByRole('button', { name: /Add page/ }).click();
+  await expect(page.locator('[data-act="delBook"]')).toHaveCount(1);
+  await expect(page.locator('.task', { has: page.locator('[data-act="delBook"]') })).toContainText('Page 1');
+});
+});
