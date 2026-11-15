@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { tokens, follow } from '../js/follow.js';
+import { tokens, follow, companion, chooseGuesses } from '../js/follow.js';
 
 const run = (page, heard, lang = 'en-GB') => follow(tokens(page, lang), tokens(heard, lang));
 
@@ -39,4 +39,32 @@ test('a word sounded out by syllables counts as read', () => {
   assert.deepEqual(run(page, 'bola itu ber war na merah ali main bola de ngan ka wan di pa dang', 'ms-MY').state, Array(11).fill('ok'));
   // Halfway through sounding out, the word isn't read yet.
   assert.deepEqual(run('berwarna merah', 'ber war', 'ms-MY').state, [null, null]);
+});
+
+const read = (page, heard, lang = 'en-GB') => companion(tokens(page, lang), tokens(heard, lang));
+
+test('companion: a word read past turns orange; reading it again makes it ok', () => {
+  const page = 'Sam has a big red ball';
+  assert.deepEqual(read(page, 'sam has a red').state, ['ok', 'ok', 'ok', 'orange', 'ok', null]);
+  assert.equal(read(page, 'sam has a red').next, 3);
+  assert.deepEqual(read(page, 'sam has a red big ball').state, Array(6).fill('ok'));
+});
+
+test('companion: reading on past an orange word turns it red; the page is done when nothing is left', () => {
+  const r = read('Sam has a big red ball', 'sam has a red ball');
+  assert.deepEqual(r.state, ['ok', 'ok', 'ok', 'red', 'ok', 'ok']);
+  assert.equal(r.done, true);
+  assert.equal(r.next, -1);
+});
+
+test('companion: sounding out by syllables and Mandarin characters work too', () => {
+  assert.equal(read('Bola itu berwarna merah', 'bola itu ber war na merah', 'ms-MY').done, true);
+  assert.deepEqual(read('我爱妈妈', '我妈', 'zh-CN').state, ['ok', 'orange', 'ok', null]);
+});
+
+test('chooseGuesses takes the guess that fits the page', () => {
+  const page = tokens('he kicks the ball', 'en-GB');
+  const { heard, used } = chooseGuesses(page, [[tokens('he keeps', 'en-GB'), tokens('he kicks', 'en-GB')], [tokens('the ball', 'en-GB')]]);
+  assert.deepEqual(used, [1, 0]);
+  assert.equal(companion(page, heard).done, true);
 });

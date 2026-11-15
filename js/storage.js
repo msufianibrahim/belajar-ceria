@@ -18,6 +18,8 @@ const defaults = () => ({
   practiceDay: { date: '', rounds: 0, paid: false },
   paused: {},                   // levelId -> a round stopped halfway (see app.js saveRound)
   ink: {},                      // digit -> his own handwriting templates (see app.js learnInk)
+  books: [],                    // reading companion pages the parent added: { id, title, lang, text }
+  reads: {},                    // page id -> { date, red } of his last full read (red = words he needed to hear)
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
 });
 

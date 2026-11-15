@@ -78,7 +78,14 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
    the tablet. Caveats told to user: built for adult voices, needs internet, audio goes to
    Google/Apple. Later maybe OCR from a photo of the page.
    **Mic test page built (2026-11-15):** `mic-test.html` (not linked from the app), word matching
-   in `js/follow.js` (tests/follow.test.js). Next: try it with him on the tablet, then build the companion.
+   in `js/follow.js` (tests/follow.test.js). User tried it in Edge: 14/18 English words; he sounds
+   words out by syllables, so heard pieces may join into one word (up to 4); the best of up to 5
+   recognizer guesses per phrase is used.
+   **Companion v1 built (2026-11-15):** parent adds pages (title, language, text) in the parent
+   area; home shows 📚 Read a book when pages exist; reading screen follows `companion()` rules
+   in js/follow.js; js/listen.js wraps speech recognition (auto-restarts on Android pauses).
+   `state.books`, `state.reads` (last red count). **No coins for reading yet** — reward design
+   says ask first. Next: he tries it on the tablet; later maybe OCR from a photo of the page.
 2. The rest of Iqra 1–2.
 3. Asas Islam — not started.
 
@@ -92,4 +99,5 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
 - sw.js: network-first offline cache; add new files to `FILES`; `cache: 'reload'` on install.
 - e2e helper `open(page, seed)` turns Practice first and auto practice **off** unless a test
   sets them; `window.__test` (with `?test`) exposes answers for tests.
-- `npm start` serves on :8000. Playwright config starts its own server.
+- `npm start` serves on :8000. Playwright config starts its own server (`tools/serve.py`: Python's
+  stock http.server refuses connections on Windows under parallel tests).

@@ -9,10 +9,12 @@ import { SHOP, REAL_WORLD, allStickers } from './catalog.js';
 import { avatarSvg } from './avatar.js';
 import { recognize, toCloud } from './digits.js';
 import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
+import { tokens, companion, chooseGuesses } from './follow.js';
+import { canListen, listen, LISTEN_LANG } from './listen.js';
 
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
 // Screens where the play clock runs and the rest gate applies.
-const KID_SCREENS = new Set(['home', 'subject', 'play', 'placement', 'results', 'stickers', 'shop']);
+const KID_SCREENS = new Set(['home', 'subject', 'play', 'placement', 'results', 'stickers', 'shop', 'books', 'reading']);
 
 const app = document.getElementById('app');
 let state = load();
@@ -49,6 +51,7 @@ setInterval(() => {
 // ---------------------------------------------------------------- navigation
 
 function go(name, data = {}) {
+  stopListening(); // leaving the reading screen (or restarting it) turns the mic off
   // 'results' is exempt so a round that runs over time still shows its rewards.
   if (KID_SCREENS.has(name) && name !== 'results' && mustRest()) {
     view = { name: 'sleepy' };
@@ -66,6 +69,7 @@ function render() {
     home: homeScreen, subject: subjectScreen, play: questionScreen, placement: questionScreen,
     results: resultsScreen, stickers: stickersScreen, shop: shopScreen,
     sleepy: sleepyScreen, gate: gateScreen, parent: parentScreen,
+    books: booksScreen, reading: readingScreen,
   };
   document.documentElement.lang = state.settings.lang;
   app.innerHTML = screens[view.name]();
@@ -176,6 +180,7 @@ function homeScreen() {
     ${practiceCard()}
     <section class="subjects">${tiles}</section>
     ${pickReview(state, SUBJECTS, todayKey()) ? `<button class="big-btn review" data-act="review">🔁 ${tr('Review', 'Ulang kaji')} <small>— 👑 = 🪙 ${COINS.mastery}</small></button>` : ''}
+    ${state.books.length ? `<button class="big-btn books" data-act="go" data-arg="books">📚 ${tr('Read a book', 'Baca buku')}</button>` : ''}
     <nav class="bottom">
       <button class="big-btn" data-act="go" data-arg="stickers">📒 ${tr('Stickers', 'Pelekat')} <b>${state.stickers.length}</b></button>
       <button class="big-btn" data-act="go" data-arg="shop">🛍️ ${tr('Shop', 'Kedai')}</button>
@@ -445,6 +450,14 @@ function parentScreen() {
           `<option value="${l.id}" ${state.settings.practice?.[k] === l.id ? 'selected' : ''}>${N(l.title)}</option>`).join('')}</optgroup>`).join('')}
       </select></label>`).join('') : ''}
     </section>
+    <section class="panel"><h3>📚 ${tr('Reading companion', 'Teman membaca')}</h3>
+      <p class="muted">${tr('Add a page from his book. He reads it aloud and the tablet follows along: a missed word turns orange (one more try), then red; only red words can be tapped to hear them. Needs internet; the audio goes to Google or Apple; speech recognition is built for adult voices.', 'Tambah muka surat dari bukunya. Dia baca dengan kuat dan tablet mengikut: perkataan tertinggal jadi jingga (cuba sekali lagi), kemudian merah; hanya perkataan merah boleh ditekan untuk didengar. Perlu internet; audio dihantar ke Google atau Apple; pengecaman suara dibina untuk suara dewasa.')}</p>
+      ${state.books.map((b) => `<div class="task"><span>${langTag(b.lang)} ${esc(b.title)}</span><button class="btn danger" data-act="delBook" data-arg="${b.id}">${tr('Delete', 'Padam')}</button></div>`).join('')}
+      <label>${tr('Title', 'Tajuk')} <input id="book-title" maxlength="40"></label>
+      <label>${tr('Language', 'Bahasa')} <select id="book-lang">${BOOK_LANGS.map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label>
+      <textarea id="book-text" rows="5" maxlength="2000" placeholder="${tr('Type or paste the words on the page', 'Taip atau tampal perkataan pada muka surat')}"></textarea>
+      <button class="btn" data-act="addBook">➕ ${tr('Add page', 'Tambah muka surat')}</button>
+    </section>
     <section class="panel"><h3>${tr('Real-world rewards', 'Hadiah dunia sebenar')}</h3>
       <p class="muted">${tr('Give a sticker when your child does these with you.', 'Beri pelekat bila anak buat aktiviti ini bersama anda.')}</p>${tasks}
     </section>
@@ -455,6 +468,128 @@ function parentScreen() {
       <label class="btn">⬆️ ${tr('Restore backup', 'Pulihkan salinan')}<input id="import-file" type="file" accept="application/json,.json" hidden></label>
       <button class="btn danger" data-act="reset">${tr('Delete all progress', 'Padam semua kemajuan')}</button>
     </section>`;
+}
+
+// ---------------------------------------------------------------- reading companion
+
+const BOOK_LANGS = [['ms', 'Bahasa Melayu', 'BM'], ['en', 'English', 'EN'], ['zh', '华文', '华']];
+const langTag = (lang) => `<b class="lang-tag">${BOOK_LANGS.find(([v]) => v === lang)?.[2] ?? ''}</b>`;
+const bookById = (id) => state.books.find((b) => b.id === id);
+
+// The page's words as written, each with its index among the words he must read
+// (-1 for punctuation). Mandarin goes character by character.
+function pageWords(b) {
+  let k = 0;
+  if (b.lang === 'zh') return [...b.text].filter((ch) => ch.trim()).map((w) => ({ w, k: /\p{Script=Han}/u.test(w) ? k++ : -1 }));
+  return b.text.split(/\s+/).filter(Boolean).map((w) => ({ w, k: tokens(w, LISTEN_LANG[b.lang]).length ? k++ : -1 }));
+}
+
+function booksScreen() {
+  const items = state.books.map((b) => {
+    const r = state.reads[b.id];
+    const last = r ? `<small>${r.red ? `✓ 🔴 ${r.red}` : '✓ ⭐'}</small>` : '';
+    return `<button class="big-btn book" data-act="read" data-arg="${b.id}">${langTag(b.lang)} ${esc(b.title)} ${last}</button>`;
+  }).join('');
+  return `${topBar(`📚 ${tr('Read a book', 'Baca buku')}`)}<section class="book-list">${items}</section>`;
+}
+
+function readingScreen() {
+  const b = bookById(view.bookId);
+  const words = pageWords(b).map(({ w, k }) => `<span${k >= 0 ? ` data-w="${k}"` : ''}>${esc(w)}</span>`).join(b.lang === 'zh' ? '' : ' ');
+  return `${topBar(esc(b.title))}
+    <section class="reading ${b.lang === 'zh' ? 'zh' : ''}" lang="${b.lang}">${words}</section>
+    <p class="read-status" aria-live="polite">${canListen ? tr('Tap 🎤 and read the page aloud.', 'Tekan 🎤 dan baca dengan kuat.') : tr("This browser can't listen. Use Chrome or Edge.", 'Pelayar ini tak boleh mendengar. Guna Chrome atau Edge.')}</p>
+    <button class="big-btn mic" data-act="mic" ${canListen ? '' : 'disabled'}>🎤 ${tr('Start reading', 'Mula baca')}</button>`;
+}
+
+const READ_ERRORS = {
+  'not-allowed': ['The microphone is blocked. A grown-up can allow it in the browser settings.', 'Mikrofon disekat. Orang dewasa boleh benarkan dalam tetapan pelayar.'],
+  'service-not-allowed': ['The microphone is blocked. A grown-up can allow it in the browser settings.', 'Mikrofon disekat. Orang dewasa boleh benarkan dalam tetapan pelayar.'],
+  'audio-capture': ['No microphone found.', 'Mikrofon tidak dijumpai.'],
+  'language-not-supported': ["This tablet can't listen in this language.", 'Tablet ini tak boleh mendengar bahasa ini.'],
+  network: ['No internet: listening needs it.', 'Tiada internet: perlu internet untuk mendengar.'],
+  'no-speech': ["I can't hear you. Read a bit louder!", 'Tak dengar. Baca kuat sikit!'],
+};
+const readStatus = (text) => { const el = app.querySelector('.read-status'); if (el) el.textContent = text; };
+
+let stopMic = null;
+function stopListening() {
+  stopMic?.();
+  stopMic = null;
+}
+
+// Stopping and starting again carries on from where he got to.
+function toggleMic() {
+  if (stopMic) { stopListening(); return updateReading(); }
+  const b = bookById(view.bookId);
+  const before = view.phrases ?? [];
+  const stop = listen(LISTEN_LANG[b.lang], {
+    onHeard: (phrases, interim) => {
+      if (stopMic !== stop) return;
+      view.phrases = [...before, ...phrases];
+      view.interim = interim;
+      updateReading();
+    },
+    onError: (err, still) => {
+      if (stopMic !== stop) return;
+      const msg = READ_ERRORS[err];
+      if (msg) readStatus(tr(...msg));
+      if (!still) { stopMic = null; updateReading(false); }
+    },
+  });
+  stopMic = stop;
+  updateReading();
+}
+
+function updateReading(status = true) {
+  if (view.name !== 'reading' || view.finished) return;
+  const b = bookById(view.bookId);
+  const l = LISTEN_LANG[b.lang];
+  const expected = tokens(b.text, l);
+  const { heard } = chooseGuesses(expected, (view.phrases ?? []).map((alts) => alts.map((a) => tokens(a, l))));
+  const res = companion(expected, [...heard, ...tokens(view.interim ?? '', l)]);
+  for (const el of app.querySelectorAll('.reading [data-w]')) {
+    const k = Number(el.dataset.w);
+    const s = res.state[k];
+    el.className = [s ?? '', k === res.next && stopMic ? 'next' : ''].join(' ').trim();
+    // Only red words can be tapped to hear, so he can't just tap every word.
+    if (s === 'red') el.dataset.act = 'hear'; else delete el.dataset.act;
+  }
+  if (res.done) return finishPage(b, res);
+  const mic = app.querySelector('.mic');
+  mic.classList.toggle('on', !!stopMic);
+  mic.textContent = stopMic ? `⏹ ${tr('Stop', 'Berhenti')}` : `🎤 ${view.phrases?.length ? tr('Carry on reading', 'Sambung baca') : tr('Start reading', 'Mula baca')}`;
+  if (status && stopMic) {
+    readStatus(res.state.includes('orange')
+      ? tr('Try the orange word again!', 'Cuba baca perkataan jingga sekali lagi!')
+      : tr('I’m listening…', 'Saya sedang dengar…'));
+  }
+}
+
+function finishPage(b, res) {
+  stopListening();
+  view.finished = true;
+  const red = res.state.filter((s) => s === 'red').length;
+  state.reads[b.id] = { date: todayKey(), red };
+  persist();
+  chime('right');
+  say(tr('Well done! You read the whole page!', 'Hebat! Habis baca satu muka surat!'));
+  readStatus(`🎉 ${tr('You read the whole page!', 'Habis baca satu muka surat!')}${red ? ` ${tr('Tap the red words to hear them.', 'Tekan perkataan merah untuk dengar.')}` : ''}`);
+  const mic = app.querySelector('.mic');
+  mic.classList.remove('on');
+  mic.dataset.act = 'read';
+  mic.dataset.arg = b.id;
+  mic.textContent = `🔁 ${tr('Read again', 'Baca lagi')}`;
+}
+
+function addBook() {
+  const title = app.querySelector('#book-title').value.trim().slice(0, 40);
+  const lang = app.querySelector('#book-lang').value;
+  const text = app.querySelector('#book-text').value.trim().slice(0, 2000);
+  if (!title || !tokens(text, LISTEN_LANG[lang]).length) return alert(tr('Give the page a title and its words.', 'Beri tajuk dan perkataan muka surat.'));
+  state.books.push({ id: `b${Date.now()}`, title, lang, text });
+  persist();
+  render();
 }
 
 // ---------------------------------------------------------------- rounds
@@ -825,6 +960,7 @@ const ACTIONS = {
   go: (name) => go(name),
   back: () => {
     if (['play', 'results'].includes(view.name)) go('subject', { subjectId: view.subjectId });
+    else if (view.name === 'reading') go('books');
     else go('home');
   },
   subject: (id) => {
@@ -860,6 +996,17 @@ const ACTIONS = {
   del: () => typeDelete(),
   enter: () => typeEnter(),
   say: () => sayQuestion(),
+  read: (id) => go('reading', { bookId: id }),
+  mic: () => toggleMic(),
+  hear: (_, el) => speak(el.textContent, VOICE[bookById(view.bookId).lang]),
+  addBook: () => addBook(),
+  delBook: (id) => {
+    if (!confirm(tr('Delete this page?', 'Padam muka surat ini?'))) return;
+    state.books = state.books.filter((b) => b.id !== id);
+    delete state.reads[id];
+    persist();
+    render();
+  },
   shopItem: (id) => shopTap(id),
   buyYes: () => buy(),
   buyNo: () => { view.pending = null; render(); },

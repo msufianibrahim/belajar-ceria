@@ -566,3 +566,53 @@ test('mic test page: uses whichever guess fits the page', async ({ page }) => {
   await expect(page.locator('#score')).toContainText('Didengar betul: 8/18');
   await expect(page.locator('#heard')).toContainText('tekaan lain: Sam has a big red ball he keeps');
 });
+
+// A fake speech recogniser: window.__hear([guess, ...]) delivers one finished phrase.
+const fakeMic = (page) => page.addInitScript(() => {
+  window.SpeechRecognition = class {
+    start() {
+      window.__hear = (guesses) => this.onresult({ resultIndex: 0, results: [Object.assign(guesses.map((transcript) => ({ transcript, confidence: 0.9 })), { isFinal: true })] });
+    }
+    stop() {}
+  };
+});
+
+test('parent adds a book page; it shows on home for reading', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('.big-btn.books')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Parents' }).click();
+  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
+  await page.locator('.gate input').fill(String(a * b));
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.locator('#book-title').fill('Sam');
+  await page.locator('#book-lang').selectOption('en');
+  await page.locator('#book-text').fill('Sam has a big red ball.');
+  await page.getByRole('button', { name: /Add page/ }).click();
+  await expect(page.locator('[data-act="delBook"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.locator('.big-btn.books').click();
+  await expect(page.locator('.big-btn.book')).toContainText('Sam');
+});
+
+test('reading companion: missed word turns orange, then red if he reads on; only red words can be tapped', async ({ page }) => {
+  await fakeMic(page);
+  await open(page, { books: [{ id: 'b1', title: 'Sam', lang: 'en', text: 'Sam has a big red ball. He kicks it.' }] });
+  await page.locator('.big-btn.books').click();
+  await page.locator('.big-btn.book').click();
+  await expect(page.locator('.reading [data-w]')).toHaveCount(9);
+  await page.locator('.mic').click();
+  await page.evaluate(() => window.__hear(['Sam has a red']));
+  await expect(page.locator('.reading .ok')).toHaveCount(4);
+  await expect(page.locator('.reading [data-w="3"]')).toHaveClass(/orange/);
+  await expect(page.locator('.read-status')).toContainText('orange');
+  await expect(page.locator('.reading [data-act="hear"]')).toHaveCount(0);
+  // He reads on without the orange word: it turns red. A later guess that fits the page is used.
+  await page.evaluate(() => window.__hear(['ball he keeps it', 'ball he kicks it']));
+  await expect(page.locator('.reading [data-w="3"]')).toHaveClass(/red/);
+  await expect(page.locator('.reading [data-act="hear"]')).toHaveCount(1);
+  await expect(page.locator('.read-status')).toContainText('whole page');
+  await expect(page.locator('.mic')).toContainText('Read again');
+  const reads = await page.evaluate(() => JSON.parse(localStorage.getItem('belajar-ceria-v1')).reads);
+  expect(reads.b1.red).toBe(1);
+  await page.screenshot({ path: 'test-results/reading.png' });
+});

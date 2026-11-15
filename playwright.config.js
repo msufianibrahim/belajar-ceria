@@ -8,12 +8,12 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: 'http://127.0.0.1:4173',
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `${process.platform === 'win32' ? 'python' : 'python3'} -m http.server 4173`, // Windows has no python3
-    url: 'http://localhost:4173',
+    command: `${process.platform === 'win32' ? 'python' : 'python3'} tools/serve.py 4173`, // Windows has no python3
+    url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     stderr: 'ignore', // python's per-request log
   },

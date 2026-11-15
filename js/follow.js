@@ -33,7 +33,9 @@ export function follow(expected, heard) {
   const state = expected.map(() => null);
   let next = 0;
   for (let i = 0; i < heard.length;) {
-    const m = matchAt(expected, heard, i, next);
+    const cands = [];
+    for (let k = next; k < Math.min(expected.length, next + LOOKAHEAD + 1); k++) cands.push(k);
+    const m = matchAt(expected, heard, i, cands);
     if (!m) { i++; continue; }
     for (let s = next; s < m.k; s++) state[s] = 'skipped';
     state[m.k] = 'ok';
@@ -47,9 +49,9 @@ export function follow(expected, heard) {
 // up to this many heard pieces may join into one page word.
 const MAX_PIECES = 4;
 
-// The nearest page word (from `next`) that heard[i], or heard[i..] joined, reads as.
-function matchAt(expected, heard, i, next) {
-  for (let k = next; k < Math.min(expected.length, next + LOOKAHEAD + 1); k++) {
+// The first candidate page word that heard[i], or heard[i..] joined, reads as.
+function matchAt(expected, heard, i, cands) {
+  for (const k of cands) {
     let joined = '';
     for (let len = 1; len <= MAX_PIECES && i + len <= heard.length; len++) {
       joined += heard[i + len - 1];
@@ -58,4 +60,42 @@ function matchAt(expected, heard, i, next) {
     }
   }
   return null;
+}
+
+// The reading companion's rules. A word he reads past turns 'orange': he gets one more try.
+// If he reads on again without it, it turns 'red' (then he may tap it to hear it).
+// Returns one state per page word ('ok' | 'orange' | 'red' | null), `next` (the word to read,
+// -1 when none is left) and `done`.
+export function companion(expected, heard) {
+  const state = expected.map(() => null);
+  const open = (k) => state[k] === null || state[k] === 'orange';
+  for (let i = 0; i < heard.length;) {
+    const cands = [];
+    for (let k = 0; k < expected.length && cands.length <= LOOKAHEAD; k++) if (open(k)) cands.push(k);
+    if (!cands.length) break;
+    const m = matchAt(expected, heard, i, cands);
+    if (!m) { i++; continue; }
+    for (const c of cands) {
+      if (c === m.k) break;
+      state[c] = state[c] === 'orange' ? 'red' : 'orange';
+    }
+    state[m.k] = 'ok';
+    i += m.len;
+  }
+  const next = state.findIndex((s, k) => open(k));
+  return { state, next, done: next === -1 };
+}
+
+// Recognition gives a few guesses per phrase (token lists); take, phrase by phrase, the guess
+// that gets the most page words read. Returns all heard tokens and the guess used per phrase.
+export function chooseGuesses(expected, phrases, rules = companion) {
+  const score = (toks) => rules(expected, toks).state.filter((s) => s === 'ok').length;
+  let heard = [];
+  const used = phrases.map((alts) => {
+    const tries = alts.map((a) => [...heard, ...a]);
+    const best = tries.reduce((b, t, i) => (score(t) > score(tries[b]) ? i : b), 0);
+    heard = tries[best];
+    return best;
+  });
+  return { heard, used };
 }

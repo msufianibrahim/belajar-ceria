@@ -240,3 +240,18 @@ button:disabled { cursor: default; }
 .level.today { outline: 4px solid #ffb74d; }
 .level.waiting { opacity: .45; }
 .big-btn.continue { background: #c8e6ff; }
+
+/* Reading companion */
+.book-list { display: grid; gap: 12px; }
+.lang-tag { display: inline-block; min-width: 2.2em; padding: 2px 6px; border-radius: 8px; background: #7cc6fe; color: #fff; font-size: .8em; text-align: center; }
+.reading { background: #fff; border-radius: var(--radius); padding: 18px; font-size: 2.4rem; line-height: 1.9; box-shadow: 0 3px 0 #0001; overflow-wrap: anywhere; }
+.reading.zh { font-size: 2.8rem; letter-spacing: .06em; }
+.reading span { padding: 0 4px; border-radius: 10px; transition: background .2s; }
+.reading .ok { background: #c8f0cf; }
+.reading .orange { background: #ffc078; animation: pulse 1s ease-in-out infinite alternate; }
+.reading .red { background: #ff9e9e; cursor: pointer; text-decoration: underline dotted; }
+.reading .next { outline: 3px solid #7cc6fe; }
+@keyframes pulse { to { background: #ffe0b8; } }
+.read-status { text-align: center; font-weight: 700; min-height: 1.5em; margin: 14px 0; }
+.big-btn.mic.on { background: #ff9e9e; }
+#book-text { width: 100%; box-sizing: border-box; font: inherit; border-radius: 12px; padding: 8px; margin: 6px 0; }

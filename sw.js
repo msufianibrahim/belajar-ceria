@@ -1,6 +1,6 @@
 // Offline cache. Network-first: online, the tablet always gets the latest files;
 // offline, it falls back to this cache. Bump CACHE when FILES changes.
-const CACHE = 'belajar-ceria-v24';
+const CACHE = 'belajar-ceria-v26';
 
 const FILES = [
   './',
@@ -24,6 +24,8 @@ const FILES = [
   'js/subjects/en.js',
   'js/subjects/zh.js',
   'js/subjects/jawi.js',
+  'js/follow.js',
+  'js/listen.js',
   'fonts/noto-naskh.ttf',
   'icons/icon-192.png',
   'icons/icon-512.png',
