@@ -6,7 +6,10 @@ and how to work on it. README.md has the general architecture.
 ## Who and why
 - Built by a dad (Malaysia, MYR) for his 5-year-old son, who is heading to SJKC.
   Son uses it on an Android tablet (also tested on iPad).
-- Subjects planned: Maths, BM, English, 华文, Iqra, Jawi, Asas Islam. Built so far: **Maths** and **Iqra 3**.
+- Subjects: Maths, BM, English, 华文, Iqra, Jawi, Asas Islam. Built: **Maths**, **Iqra** (1, 3, 4–5 parts),
+  **BM**, **English**, **华文**, **Jawi** (the last four ported from the JejakJaya curriculum,
+  2026-11-15: listen / look / read-aloud levels; no speech recognition, no handwriting for letters).
+  Asas Islam not started.
 - Free, no backend: vanilla-JS ES-module PWA, no build step, progress in localStorage
   (key `belajar-ceria-v1`). Repo github.com/msufianibrahim/belajar-ceria (public),
   live at https://msufianibrahim.github.io/belajar-ceria/ (GitHub Pages from `main`).
@@ -46,7 +49,9 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
 - Levels end with column (vertical) add/subtract, 2-digit, with/without carrying/borrowing.
   He **writes** the answer digits in tens/ones boxes; `js/digits.js` is an offline $P
   point-cloud recognizer with hand-made templates (~95% on synthetic tests; real 5yo writing
-  unverified — tune templates if he reports misreads). The whole sum is a blue scribble layer
+  unverified). Tapping the number under a box opens a fix pad to correct a misread; after a right
+  answer his own writing is saved as templates (newest 5 per digit) so recognition learns his hand.
+  The whole sum is a blue scribble layer
   (strike out digits, write carries) that is never read. Parent can switch to number pad.
 - `probe: false` levels are skipped by the placement quiz (it must probe ≤ 10 levels).
 - Level ids are stored in saved progress — never rename them.
@@ -58,8 +63,8 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
 - **No sound.** Device Arabic TTS couldn't tell long from short vowels, and speech recognition
   drops harakat, so it can't check reading. The child reads aloud and a grown-up taps ✓ / ✗.
   (A Tarteel-style checker was discussed: not feasible for changed-mark words.)
-- Built: Iqra 3 (8 levels). Son was at dhammah terbalik. Next: **Iqra 1–2** (no recordings
-  needed now). Book order — Iqra 1: letters a few at a time with fathah → other writing styles
+- Built: Iqra 3 (8 levels), plus iqra1-fathah / fathah-alif, iqra4 tanwin & sukun, iqra5 shaddah
+  (2026-11-15). Son was at dhammah terbalik. Still to fill in: the rest of **Iqra 1–2**. Book order — Iqra 1: letters a few at a time with fathah → other writing styles
   of standalone letters → telling similar-sounding letters apart. Iqra 2: joined letters →
   alif vs lam when joined → long aa → other joined styles → fathah berdiri → fathah berdiri +
   dotless ya. Font: bundled `fonts/noto-naskh.ttf` (small marks render properly).
@@ -72,8 +77,8 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
    every word. Start with a small test page to check how well recognition hears his voice on
    the tablet. Caveats told to user: built for adult voices, needs internet, audio goes to
    Google/Apple. Later maybe OCR from a photo of the page.
-2. Iqra 1–2.
-3. Other subjects (BM, English, 华文, Jawi, Asas Islam) — not started.
+2. The rest of Iqra 1–2.
+3. Asas Islam — not started.
 
 ## Code map / gotchas
 - js/app.js: all screens (string templates re-rendered via `render()`), actions via
