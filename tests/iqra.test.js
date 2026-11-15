@@ -7,7 +7,7 @@ const level = (id) => iqra.levels.find((l) => l.id === id);
 const many = (fn) => { for (const l of iqra.levels) for (let n = 0; n < 300; n++) for (let pos = 0; pos < 10; pos++) fn(l.gen(pos), l, pos); };
 const F = 'َ', K = 'ِ', D = 'ُ';
 // Letters that carry a sound (the ya/wau of a long vowel only stretches it).
-const letters = (s) => [...s.replace(/[\u064A\u0648\u0649]\u0652/g, '').replace(/[\u064B-\u0670 ]/g, '')].length;
+const letters = (s) => [...s.replace(/[\u064A\u0648\u0649]\u0652/g, '').replace(/[\u064E\u064B]\u0627/g, '').replace(/[\u064B-\u0670 ]/g, '')].length;
 
 test('every question is a line to read aloud, with no sound or choices', () => {
   many((q, l) => {
@@ -37,6 +37,43 @@ test('each level only uses marks learnt so far, and always has its new one', () 
     const i = iqra.levels.indexOf(l);
     if (i < iqra.levels.findIndex((x) => x.id === 'iqra3-dhammah')) assert.ok(!q.read.includes(D), `${l.id}: ${q.read}`);
   });
+});
+
+test('Iqra 1 levels use fathah only, and the alif level always has fathah + alif', () => {
+  many((q, l) => {
+    if (!l.id.startsWith('iqra1-')) return;
+    assert.ok(!/[ً-ٍُ-ْ]/.test(q.read), `${l.id}: ${q.read}`);
+    if (l.id === 'iqra1-fathah') assert.ok(!q.read.includes('ا'), q.read);
+    else assert.match(q.read, /َا/, q.read);
+  });
+});
+
+test('tanwin ends every word that has it, fathatain with an alif', () => {
+  many((q, l) => {
+    if (l.id === 'iqra4-tanwin') for (const w of q.read.split(' ')) assert.match(w, /(ًا|[ٌٍ])$/, q.read);
+    else if (!['iqra4-sukun', 'iqra5-shaddah'].includes(l.id)) assert.ok(!/[ً-ٍ]/.test(q.read), `${l.id}: ${q.read}`);
+  });
+});
+
+test('sukun and shaddah sit on a letter after a short vowel; shaddah takes a vowel', () => {
+  many((q, l) => {
+    // A consonant (not the ya/wau of a long vowel) with sukun.
+    if (l.id === 'iqra4-sukun') assert.match(q.read, /[َُِ][^يوى ]ْ/, q.read);
+    if (l.id === 'iqra5-shaddah') {
+      assert.match(q.read, /[َُِ]\Sّ[َُِ]/, q.read);
+      assert.equal((q.read.match(/ّ/g) || []).length, (q.read.match(/ّ[َُِ]/g) || []).length, q.read);
+    } else assert.ok(!q.read.includes('ّ'), `${l.id}: ${q.read}`);
+  });
+});
+
+test('level and sticker ids are unique, in book order', () => {
+  const ids = iqra.levels.map((l) => l.id);
+  assert.equal(new Set(ids).size, ids.length);
+  const st = iqra.levels.map((l) => l.sticker.id);
+  assert.equal(new Set(st).size, st.length);
+  assert.equal(new Set(iqra.levels.map((l) => l.sticker.e)).size, st.length);
+  const book = (id) => +id.match(/^iqra(\d)/)[1];
+  assert.deepEqual(ids.map(book), [...ids.map(book)].sort());
 });
 
 test('a round has 10 different questions', () => {

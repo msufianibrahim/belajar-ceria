@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
+  timeout: 60000, // the long practice test takes ~32s on a slower laptop
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
@@ -10,7 +11,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'python3 -m http.server 4173',
+    command: `${process.platform === 'win32' ? 'python' : 'python3'} -m http.server 4173`, // Windows has no python3
     url: 'http://localhost:4173',
     reuseExistingServer: !process.env.CI,
     stderr: 'ignore', // python's per-request log

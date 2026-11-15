@@ -198,7 +198,7 @@ function subjectScreen() {
     const waiting = gate && isOpen(state, s, i) && !gate.has(l.id);
     const locked = !isOpen(state, s, i) || waiting;
     const badge = waiting ? '🎯' : locked ? '🔒' : r?.mastered ? '👑' : i + 1;
-    const zh = !locked && questionLang(state, l.id, s.mandarin) === 'zh' ? '<span class="tag">华文</span>' : '';
+    const zh = !locked && questionLang(state, l.id, !!s.mandarin) === 'zh' ? '<span class="tag">华文</span>' : '';
     const toward = r?.cleared && !r.mastered ? `<span class="tag gold">👑 ${r.perfectDays.length}/${MASTERY_DAYS} → 🪙 ${COINS.mastery}</span>` : '';
     // What this level can still pay, so he knows where the coins are.
     const pays = locked || r?.mastered ? 0 : !r?.cleared ? COINS.firstClear : r.best < ROUND ? COINS.newBest : 0;
@@ -226,7 +226,7 @@ function questionScreen() {
       ${q.visual ? `<div class="visual">${q.visual}</div>` : ''}
       ${q.text ? `<div class="qtext">${q.text}</div>` : ''}
       ${q.column ? columnSum(q.column, view.mode !== 'type' && state.settings.columnInput !== 'pad') : ''}
-      ${q.read ? `<div class="read ar">${q.read}</div>` : ''}
+      ${q.read ? `<div class="read ${subjectById(view.subjectId).arabic ? 'ar' : ''}">${q.read}</div>` : ''}
       <button class="speak" data-act="say">🔊 ${promptHtml(q.prompt, currentLang())}</button>
     </div>
     ${q.read ? checker() : q.column ? (state.settings.columnInput === 'pad' ? keypad() : boardButtons()) : view.mode === 'type' ? keypad() : `<div class="choices ${q.wide ? 'wide' : ''} ${q.stack ? 'stack' : ''}">
@@ -458,10 +458,13 @@ function parentScreen() {
 const currentQ = () => (view.name === 'play' ? view.qs[view.i] : view.q);
 const currentLang = () => {
   const s = subjectById(view.subjectId);
-  return questionLang(state, s.levels[view.levelIdx].id, s.mandarin);
+  // A language subject (BM, English, 华文, Jawi) always asks in its own language.
+  return s.lang ?? questionLang(state, s.levels[view.levelIdx].id, !!s.mandarin);
 };
 function sayQuestion() {
-  say(currentQ().prompt[currentLang()], currentLang());
+  // `say`: listening questions speak the word but don't print it (the prompt would give it away).
+  const q = currentQ();
+  say(q.say ?? q.prompt[currentLang()], currentLang());
 }
 
 // Mandarin shows characters, pinyin, and an English subtitle.

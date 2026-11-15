@@ -47,10 +47,10 @@ async function answerWrong(page) {
 const coins = (page) => page.locator('.coins');
 const placed = { placed: { math: true } };
 
-test('home: Math is open, other subjects are coming soon', async ({ page }) => {
+test('home: all subjects open except Islamic Studies (coming soon)', async ({ page }) => {
   await open(page);
   await expect(page.getByRole('button', { name: /Maths/ })).toBeEnabled();
-  await expect(page.locator('.tile.locked')).toHaveCount(5);
+  await expect(page.locator('.tile.locked')).toHaveCount(1);
   await expect(coins(page)).toHaveText('🪙 0');
 });
 
@@ -353,7 +353,7 @@ test('passing Add within 5 opens Add within 10 straight away', async ({ page }) 
 test('Iqra: opens up to Dhammah terbalik without a quiz; a round can be completed', async ({ page }) => {
   await open(page);
   await page.getByRole('button', { name: /Iqra/ }).click();
-  await expect(page.locator('.level:not(.locked)')).toHaveCount(7);
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(9);
   await expect(levelButton(page, 'Mix: a, i, u')).toBeDisabled();
   await levelButton(page, 'Dhammah terbalik').click();
   await expect(page.locator('.speak')).toContainText('Read it aloud!');
@@ -489,4 +489,19 @@ test('stopping halfway saves the round: Continue picks up at the same question, 
   await page.getByRole('button', { name: /Next/ }).click();
   await page.getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.locator('.big-btn.continue')).toHaveCount(0);
+});
+
+test('Bahasa Melayu: no quiz, starts at level 1; listening hides the answer; reading is checked by a grown-up', async ({ page }) => {
+  await open(page);
+  await page.getByRole('button', { name: /Bahasa Melayu/ }).click();
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(1);
+  await page.locator('.level').first().click();
+  await expect(page.locator('.speak')).toHaveText('🔊 Dengar, kemudian pilih.');
+  await expect(page.locator('.choice')).toHaveCount(3);
+  for (let i = 0; i < 10; i++) await answerRight(page);
+  await page.getByRole('button', { name: /Next/ }).click();
+  await page.locator('.level:not(.locked)').nth(1).click();
+  await expect(page.locator('.read')).toHaveCount(1);
+  await expect(page.locator('.read.ar')).toHaveCount(0);
+  await expect(page.locator('.checker')).toHaveCount(1);
 });

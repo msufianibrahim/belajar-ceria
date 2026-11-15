@@ -9,7 +9,9 @@ import { pick } from './util.js';
 // with a teacher. The tablet's Arabic voice couldn't be trusted with long vs short vowels
 // (sound-test.html), and Arabic speech recognition drops the marks, so it can't check them.
 
-const F = 'َ', K = 'ِ', D = 'ُ', SUK = 'ْ';
+const F = 'َ', K = 'ِ', D = 'ُ', SUK = 'ْ', SHADDAH = 'ّ';
+const TF = 'ً', TK = 'ٍ', TD = 'ٌ';
+const ALIF = 'ا';
 const K_BERDIRI = 'ٖ', D_TERBALIK = 'ٗ';
 const YA = 'ي', WAU = 'و', YA_TANPA_TITIK = 'ى', HA = 'ه';
 
@@ -20,14 +22,16 @@ const ROOTS = [
   'غفر', 'صبر', 'ذكر', 'حفظ', 'نظر', 'طلب', 'فعل', 'عمل', 'قدر', 'بلغ', 'سبح', 'شهد',
 ].map((r) => [...r]);
 
-// A word is a list of syllables { l: letter, m: mark, long: 'ya' | 'ya0' (dotless) | 'wau' | null }.
+// A word is a list of syllables { l: letter, m: mark, long: 'ya' | 'ya0' (dotless) | 'wau' | 'alif' | null, sh?: shaddah }.
 // The small marks on ha are syllables with m = K_BERDIRI / D_TERBALIK.
-const write = (s) => s.l + s.m + (s.long === 'ya' ? YA + SUK : s.long === 'ya0' ? YA_TANPA_TITIK + SUK : s.long === 'wau' ? WAU + SUK : '');
+const write = (s) => s.l + (s.sh ? SHADDAH : '') + s.m + (s.long === 'alif' ? ALIF : s.long === 'ya' ? YA + SUK : s.long === 'ya0' ? YA_TANPA_TITIK + SUK : s.long === 'wau' ? WAU + SUK : '');
 const shown = (words) => words.map((w) => w.map(write).join('')).join(' ');
 
 // What each level has learnt so far, and its new thing (`target`).
-// short: marks; ii/uu: long vowels allowed; ya0: dotless ya allowed at the end of a word.
+// short: marks; ii/uu/aa: long vowels allowed; ya0: dotless ya allowed at the end of a word.
 const STAGES = {
+  fathah:      { short: [F], target: null },
+  fathahAlif:  { short: [F], aa: true, target: 'aa' },
   kasrah:      { short: [F, K], target: 'K' },
   kasrahYa:    { short: [F, K], ii: true, target: 'ii' },
   berdiri:     { short: [F, K], ii: true, target: 'berdiri' },
@@ -36,12 +40,15 @@ const STAGES = {
   dhammahWau:  { short: [F, K, D], ii: true, ya0: true, uu: true, target: 'uu' },
   terbalik:    { short: [F, K, D], ii: true, ya0: true, uu: true, target: 'terbalik' },
   mix:         { short: [F, K, D], ii: true, ya0: true, uu: true, target: null },
+  tanwin:      { short: [F, K, D], ii: true, ya0: true, uu: true, aa: true, target: 'tanwin' },
+  sukun:       { short: [F, K, D], ii: true, ya0: true, uu: true, aa: true, target: 'sukun' },
+  shaddah:     { short: [F, K, D], ii: true, ya0: true, uu: true, aa: true, target: 'shaddah' },
 };
 
 function syllable(l, st) {
   const m = pick(st.short);
   // Now and then a long vowel, if learnt: ii after kasrah, uu after dhammah.
-  const long = (m === K && st.ii && Math.random() < 0.3) ? 'ya' : (m === D && st.uu && Math.random() < 0.3) ? 'wau' : null;
+  const long = (m === K && st.ii && Math.random() < 0.3) ? 'ya' : (m === D && st.uu && Math.random() < 0.3) ? 'wau' : (m === F && st.aa && Math.random() < 0.3) ? 'alif' : null;
   return { l, m, long };
 }
 
@@ -51,6 +58,7 @@ function addTarget(w, st) {
   switch (st.target) {
     case 'K': w[i] = { l: w[i].l, m: K, long: null }; break;
     case 'D': w[i] = { l: w[i].l, m: D, long: null }; break;
+    case 'aa': w[i] = { l: w[i].l, m: F, long: 'alif' }; break;
     case 'ii': w[i] = { l: w[i].l, m: K, long: 'ya' }; break;
     case 'uu': w[i] = { l: w[i].l, m: D, long: 'wau' }; break;
     case 'ya0': w[w.length - 1] = { l: w[w.length - 1].l, m: K, long: 'ya0' }; break;
@@ -60,6 +68,19 @@ function addTarget(w, st) {
       const last = w[w.length - 1];
       w[w.length - 1] = { ...last, m: pick([F, D]), long: null };
       w.push({ l: HA, m: D_TERBALIK, long: null });
+      break;
+    }
+    // Tanwin ends a word; fathatain takes an alif (كَتَبًا).
+    case 'tanwin': {
+      const m = pick([TF, TK, TD]);
+      w[w.length - 1] = { l: w[w.length - 1].l, m, long: m === TF ? 'alif' : null };
+      break;
+    }
+    // Sukun / shaddah sit on a letter after the first, which needs a short vowel before it.
+    case 'sukun': case 'shaddah': {
+      const j = 1 + Math.floor(Math.random() * (w.length - 1));
+      w[j - 1] = { ...w[j - 1], long: null };
+      w[j] = st.target === 'sukun' ? { l: w[j].l, m: SUK, long: null } : { l: w[j].l, m: pick(st.short), long: null, sh: true };
       break;
     }
     default:
@@ -99,6 +120,8 @@ export default {
   placement: false,     // no placement quiz: opens up to `startAt` (parent can change it)
   startAt: 'iqra3-dhammah-terbalik',
   levels: [
+    { id: 'iqra1-fathah', title: { en: 'Fathah (a)', ms: 'Fathah (a)' }, icon: 'بَ', sticker: { id: 'st-ant', e: '🐜' }, gen: level('fathah') },
+    { id: 'iqra1-fathah-alif', needs: 'iqra1-fathah', title: { en: 'Fathah + alif (aa)', ms: 'Fathah + alif (aa)' }, icon: 'بَا', sticker: { id: 'st-caterpillar', e: '🐛' }, gen: level('fathahAlif') },
     { id: 'iqra3-kasrah', title: { en: 'Kasrah (i)', ms: 'Kasrah (i)' }, icon: 'بِ', sticker: { id: 'st-camel', e: '🐫' }, gen: level('kasrah') },
     { id: 'iqra3-kasrah-ya', needs: 'iqra3-kasrah', title: { en: 'Kasrah + ya (ii)', ms: 'Kasrah + ya (ii)' }, icon: 'بِيْ', sticker: { id: 'st-goat', e: '🐐' }, gen: level('kasrahYa') },
     { id: 'iqra3-kasrah-berdiri', needs: 'iqra3-kasrah-ya', title: { en: 'Kasrah berdiri', ms: 'Kasrah berdiri' }, icon: 'هٖ', sticker: { id: 'st-horse', e: '🐴' }, gen: level('berdiri') },
@@ -107,5 +130,8 @@ export default {
     { id: 'iqra3-dhammah-wau', needs: 'iqra3-dhammah', title: { en: 'Dhammah + wau (uu)', ms: 'Dhammah + wau (uu)' }, icon: 'بُوْ', sticker: { id: 'st-ladybug', e: '🐞' }, gen: level('dhammahWau') },
     { id: 'iqra3-dhammah-terbalik', needs: 'iqra3-dhammah-wau', title: { en: 'Dhammah terbalik', ms: 'Dhammah terbalik' }, icon: 'هٗ', sticker: { id: 'st-snail', e: '🐌' }, gen: level('terbalik') },
     { id: 'iqra3-mix', title: { en: 'Mix: a, i, u', ms: 'Campur: a, i, u' }, icon: 'بَ بِ بُ', sticker: { id: 'st-seal', e: '🦭' }, gen: level('mix') },
+    { id: 'iqra4-tanwin', title: { en: 'Tanwin (an, in, un)', ms: 'Tanwin (baris dua)' }, icon: 'بًا', sticker: { id: 'st-cricket', e: '🦗' }, gen: level('tanwin') },
+    { id: 'iqra4-sukun', needs: 'iqra4-tanwin', title: { en: 'Sukun (silent vowel)', ms: 'Sukun (huruf mati)' }, icon: 'بْ', sticker: { id: 'st-squirrel', e: '🐿️' }, gen: level('sukun') },
+    { id: 'iqra5-shaddah', needs: 'iqra4-sukun', title: { en: 'Shaddah (double)', ms: 'Shaddah (sabdu)' }, icon: 'بَّ', sticker: { id: 'st-mouse', e: '🐭' }, gen: level('shaddah') },
   ],
 };
