@@ -33,3 +33,10 @@ test('one letter off in a longer word still counts; short words must match exact
 test('Mandarin follows character by character', () => {
   assert.deepEqual(run('我爱妈妈', '我爱妈', 'zh-CN').state, ['ok', 'ok', 'ok', null]);
 });
+
+test('a word sounded out by syllables counts as read', () => {
+  const page = 'Bola itu berwarna merah. Ali main bola dengan kawan di padang.';
+  assert.deepEqual(run(page, 'bola itu ber war na merah ali main bola de ngan ka wan di pa dang', 'ms-MY').state, Array(11).fill('ok'));
+  // Halfway through sounding out, the word isn't read yet.
+  assert.deepEqual(run('berwarna merah', 'ber war', 'ms-MY').state, [null, null]);
+});

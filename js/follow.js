@@ -32,14 +32,30 @@ const LOOKAHEAD = 3;
 export function follow(expected, heard) {
   const state = expected.map(() => null);
   let next = 0;
-  for (const h of heard) {
-    for (let k = next; k < Math.min(expected.length, next + LOOKAHEAD + 1); k++) {
-      if (!close(h, expected[k])) continue;
-      for (let s = next; s < k; s++) state[s] = 'skipped';
-      state[k] = 'ok';
-      next = k + 1;
-      break;
-    }
+  for (let i = 0; i < heard.length;) {
+    const m = matchAt(expected, heard, i, next);
+    if (!m) { i++; continue; }
+    for (let s = next; s < m.k; s++) state[s] = 'skipped';
+    state[m.k] = 'ok';
+    next = m.k + 1;
+    i += m.len;
   }
   return { state, next };
+}
+
+// Sounding a word out by syllables ("ber war na") is heard as separate pieces:
+// up to this many heard pieces may join into one page word.
+const MAX_PIECES = 4;
+
+// The nearest page word (from `next`) that heard[i], or heard[i..] joined, reads as.
+function matchAt(expected, heard, i, next) {
+  for (let k = next; k < Math.min(expected.length, next + LOOKAHEAD + 1); k++) {
+    let joined = '';
+    for (let len = 1; len <= MAX_PIECES && i + len <= heard.length; len++) {
+      joined += heard[i + len - 1];
+      if (close(joined, expected[k])) return { k, len };
+      if (joined.length > expected[k].length + 1) break;
+    }
+  }
+  return null;
 }
