@@ -88,8 +88,15 @@
       // Show the page's words as they are written; match on their normalised forms.
       const shown = zh ? [...$('text').value].filter((ch) => /\p{Script=Han}/u.test(ch)) : $('text').value.split(/\s+/).filter(Boolean);
       const expected = tokens($('text').value, l);
-      const heardText = [...finals.map((f) => f.text), interim].join(' ');
-      const { state, next } = follow(expected, tokens(heardText, l));
+      // Each phrase may come with other guesses: use the one that fits the page best.
+      const fits = (toks) => follow(expected, toks).state.filter((s) => s === 'ok').length;
+      let heard = [];
+      for (const f of finals) {
+        const tries = f.alts.map((a) => [...heard, ...tokens(a, l)]);
+        f.used = tries.reduce((b, t, i) => (fits(t) > fits(tries[b]) ? i : b), 0);
+        heard = tries[f.used];
+      }
+      const { state, next } = follow(expected, [...heard, ...tokens(interim, l)]);
       // Words that are only punctuation have no token; keep them unmarked.
       let k = 0;
       $('page').innerHTML = shown.map((w) => {
@@ -101,7 +108,8 @@
       const ok = state.filter((s) => s === 'ok').length, skipped = state.filter((s) => s === 'skipped').length;
       const secs = started ? Math.round((Date.now() - started) / 1000) : 0;
       $('score').textContent = `Didengar betul: ${ok}/${expected.length} · Terlangkau: ${skipped} · Masa: ${secs}s · Mula semula oleh pelayar: ${restarts}`;
-      $('heard').innerHTML = finals.map((f) => `${f.text.replace(/</g, '&lt;')} <small>(${f.conf})</small>`).join('<br>')
+      const esc = (t) => t.replace(/</g, '&lt;');
+      $('heard').innerHTML = finals.map((f) => `${esc(f.alts[f.used ?? 0])} <small>(${f.conf})${f.alts.length > 1 ? ` · tekaan lain: ${f.alts.filter((_, i) => i !== f.used).map(esc).join(' / ')}` : ''}</small>`).join('<br>')
         + (interim ? `<br><span class="interim">${interim.replace(/</g, '&lt;')}</span>` : '');
     }
 
@@ -110,11 +118,12 @@
       rec.lang = lang();
       rec.continuous = true;
       rec.interimResults = true;
+      rec.maxAlternatives = 5; // a child's word is often in the 2nd-5th guess
       rec.onresult = (e) => {
         interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const r = e.results[i];
-          if (r.isFinal) finals.push({ text: r[0].transcript.trim(), conf: r[0].confidence ? `${Math.round(r[0].confidence * 100)}%` : '–' });
+          if (r.isFinal) finals.push({ alts: [...r].map((a) => a.transcript.trim()), conf: r[0].confidence ? `${Math.round(r[0].confidence * 100)}%` : '–' });
           else interim += r[0].transcript;
         }
         draw();

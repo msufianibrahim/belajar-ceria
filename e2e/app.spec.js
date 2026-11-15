@@ -547,3 +547,22 @@ test('mic test page: shows the sample as words, and Mandarin by character', asyn
   await expect(page.locator('#page span')).toHaveCount(18);
   expect(errors).toEqual([]);
 });
+
+test('mic test page: uses whichever guess fits the page', async ({ page }) => {
+  // A fake recogniser: its 1st guess mishears "kicks", the 2nd guess has it.
+  await page.addInitScript(() => {
+    window.SpeechRecognition = class {
+      start() {
+        const guess = (transcript, confidence) => ({ transcript, confidence });
+        const result = Object.assign([guess('Sam has a big red ball he keeps', 0.8), guess('Sam has a big red ball he kicks', 0.5)], { isFinal: true });
+        setTimeout(() => this.onresult({ resultIndex: 0, results: [result] }), 50);
+      }
+      stop() {}
+    };
+  });
+  await page.goto('/mic-test.html');
+  await page.locator('#lang').selectOption('en-GB');
+  await page.locator('#go').click();
+  await expect(page.locator('#score')).toContainText('Didengar betul: 8/18');
+  await expect(page.locator('#heard')).toContainText('tekaan lain: Sam has a big red ball he keeps');
+});
