@@ -77,6 +77,8 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
    every word. Start with a small test page to check how well recognition hears his voice on
    the tablet. Caveats told to user: built for adult voices, needs internet, audio goes to
    Google/Apple. Later maybe OCR from a photo of the page.
+   **Mic test page built (2026-11-15):** `mic-test.html` (not linked from the app), word matching
+   in `js/follow.js` (tests/follow.test.js). Next: try it with him on the tablet, then build the companion.
 2. The rest of Iqra 1–2.
 3. Asas Islam — not started.
 

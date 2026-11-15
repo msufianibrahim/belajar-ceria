@@ -537,3 +537,13 @@ test('whiteboard: clear one box only; fix a misread number on the pad; right ans
   const ink = await page.evaluate(() => JSON.parse(localStorage.getItem('belajar-ceria-v1')).ink);
   expect(ink[answer % 10]).toHaveLength(1);
 });
+
+test('mic test page: shows the sample as words, and Mandarin by character', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/mic-test.html');
+  await expect(page.locator('#page span')).toHaveCount(15);
+  await page.locator('#lang').selectOption('cmn-Hans-CN');
+  await expect(page.locator('#page span')).toHaveCount(18);
+  expect(errors).toEqual([]);
+});

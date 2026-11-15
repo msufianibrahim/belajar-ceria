@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ujian Mikrofon Membaca</title>
+  <style>
+    body { margin: 0; padding: 16px; font-family: system-ui, sans-serif; background: #fff8e7; color: #3b2f2f; }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; }
+    h2 { font-size: 1.15rem; margin: 20px 0 6px; }
+    p { margin: 4px 0; }
+    .muted { color: #0009; font-size: .9rem; }
+    .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 12px 0; }
+    select, button, textarea { font: inherit; }
+    textarea { width: 100%; box-sizing: border-box; height: 90px; border-radius: 12px; padding: 8px; }
+    #go { border: 0; border-radius: 16px; padding: 14px 28px; font-size: 1.3rem; font-weight: 700; background: #5cc46b; color: #fff; cursor: pointer; }
+    #go.on { background: #ff7b7b; }
+    #page { background: #fff; border-radius: 16px; padding: 16px; font-size: 2rem; line-height: 1.8; box-shadow: 0 3px 0 #0001; }
+    #page span { padding: 0 4px; border-radius: 8px; }
+    #page .ok { background: #c8f0cf; }
+    #page .skipped { background: #ffd8a8; }
+    #page .next { outline: 3px solid #7cc6fe; }
+    #status { font-weight: 700; }
+    .warn { background: #ffe0e0; padding: 10px; border-radius: 12px; }
+    #heard { background: #fff; border-radius: 12px; padding: 8px 12px; min-height: 3em; }
+    #heard .interim { color: #0007; font-style: italic; }
+    #heard small { color: #0008; }
+  </style>
+</head>
+<body>
+  <h1>Ujian Mikrofon Membaca</h1>
+  <p class="muted">Untuk melihat sejauh mana tablet mendengar suaranya sebelum membina teman membaca. Pilih bahasa, tekan Mula, dan minta dia baca ayat di bawah. Perkataan yang didengar jadi hijau; yang terlangkau jadi jingga.</p>
+  <p class="muted">Pengecaman suara dibina untuk suara orang dewasa, perlukan internet, dan audio dihantar ke Google (Android) atau Apple (iPad).</p>
+  <p id="unsupported" class="warn" hidden>Pelayar ini tiada pengecaman suara. Guna Chrome di Android, atau Safari di iPad.</p>
+
+  <div class="bar">
+    <label>Bahasa: <select id="lang">
+      <option value="ms-MY">Bahasa Melayu</option>
+      <option value="en-GB">English (UK)</option>
+      <option value="en-US">English (US)</option>
+      <option value="cmn-Hans-CN">华文</option>
+    </select></label>
+    <button id="go">🎤 Mula</button>
+    <span id="status"></span>
+  </div>
+
+  <label class="muted">Teks untuk dibaca (boleh ditukar, cth. salin dari buku):</label>
+  <textarea id="text"></textarea>
+
+  <h2>Halaman</h2>
+  <div id="page"></div>
+  <p id="score" class="muted"></p>
+
+  <h2>Apa yang didengar</h2>
+  <div id="heard"></div>
+
+  <script type="module">
+    import { tokens, follow } from './js/follow.js';
+
+    const SAMPLES = {
+      'ms-MY': 'Ali ada sebiji bola. Bola itu berwarna merah. Ali main bola dengan kawan di padang.',
+      'en-GB': 'Sam has a big red ball. He kicks the ball to his friend. They play in the park.',
+      'en-US': 'Sam has a big red ball. He kicks the ball to his friend. They play in the park.',
+      'cmn-Hans-CN': '我有一个红色的球。我和朋友在公园里玩球。',
+    };
+    const ERRORS = {
+      'not-allowed': 'Mikrofon tidak dibenarkan. Benarkan mikrofon untuk laman ini dalam tetapan pelayar.',
+      'service-not-allowed': 'Pengecaman suara tidak dibenarkan pada peranti ini.',
+      'network': 'Tiada internet: pengecaman suara perlukan sambungan.',
+      'no-speech': 'Tiada suara didengar. Dekatkan tablet atau baca lebih kuat.',
+      'audio-capture': 'Mikrofon tidak dijumpai.',
+      'language-not-supported': 'Bahasa ini tidak disokong di peranti ini.',
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { $('unsupported').hidden = false; $('go').disabled = true; }
+
+    let rec = null, listening = false, finals = [], interim = '', restarts = 0, started = 0;
+    let edited = false;
+
+    const lang = () => $('lang').value;
+    const status = (t) => { $('status').textContent = t; };
+
+    function draw() {
+      const l = lang();
+      const zh = l.startsWith('cmn');
+      // Show the page's words as they are written; match on their normalised forms.
+      const shown = zh ? [...$('text').value].filter((ch) => /\p{Script=Han}/u.test(ch)) : $('text').value.split(/\s+/).filter(Boolean);
+      const expected = tokens($('text').value, l);
+      const heardText = [...finals.map((f) => f.text), interim].join(' ');
+      const { state, next } = follow(expected, tokens(heardText, l));
+      // Words that are only punctuation have no token; keep them unmarked.
+      let k = 0;
+      $('page').innerHTML = shown.map((w) => {
+        const hasToken = zh || tokens(w, l).length > 0;
+        const cls = hasToken ? [state[k] ?? '', k === next && listening ? 'next' : ''].join(' ') : '';
+        if (hasToken) k++;
+        return `<span class="${cls}">${w.replace(/</g, '&lt;')}</span>`;
+      }).join(zh ? '' : ' ');
+      const ok = state.filter((s) => s === 'ok').length, skipped = state.filter((s) => s === 'skipped').length;
+      const secs = started ? Math.round((Date.now() - started) / 1000) : 0;
+      $('score').textContent = `Didengar betul: ${ok}/${expected.length} · Terlangkau: ${skipped} · Masa: ${secs}s · Mula semula oleh pelayar: ${restarts}`;
+      $('heard').innerHTML = finals.map((f) => `${f.text.replace(/</g, '&lt;')} <small>(${f.conf})</small>`).join('<br>')
+        + (interim ? `<br><span class="interim">${interim.replace(/</g, '&lt;')}</span>` : '');
+    }
+
+    function start() {
+      rec = new SR();
+      rec.lang = lang();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (e) => {
+        interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i];
+          if (r.isFinal) finals.push({ text: r[0].transcript.trim(), conf: r[0].confidence ? `${Math.round(r[0].confidence * 100)}%` : '–' });
+          else interim += r[0].transcript;
+        }
+        draw();
+      };
+      rec.onerror = (e) => {
+        status(ERRORS[e.error] ?? `Ralat: ${e.error}`);
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed' || e.error === 'language-not-supported') stop();
+      };
+      // Android ends a session after a pause even in continuous mode: carry on while listening.
+      rec.onend = () => {
+        interim = '';
+        if (listening) { restarts++; try { rec.start(); } catch { stop(); } }
+        draw();
+      };
+      rec.start();
+    }
+
+    function stop() {
+      listening = false;
+      rec?.stop();
+      $('go').textContent = '🎤 Mula';
+      $('go').classList.remove('on');
+      draw();
+    }
+
+    $('go').onclick = () => {
+      if (listening) { stop(); status('Berhenti.'); return; }
+      finals = []; interim = ''; restarts = 0; started = Date.now();
+      listening = true;
+      $('go').textContent = '⏹ Berhenti';
+      $('go').classList.add('on');
+      status('Mendengar… minta dia baca sekarang.');
+      start();
+      draw();
+    };
+
+    $('lang').onchange = () => {
+      if (listening) stop();
+      if (!edited) $('text').value = SAMPLES[lang()];
+      finals = []; draw();
+    };
+    $('text').oninput = () => { edited = true; draw(); };
+    setInterval(() => listening && draw(), 1000);
+
+    $('text').value = SAMPLES[lang()];
+    draw();
+  </script>
+</body>
+</html>
