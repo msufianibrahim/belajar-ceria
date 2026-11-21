@@ -639,3 +639,19 @@ test('a photo of the page fills in its words for the parent to check', async ({ 
   await expect(page.locator('.task', { has: page.locator('[data-act="delBook"]') })).toContainText('Page 1');
 });
 });
+
+test('a page can come from an AI app: copy the question, paste its reply', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only in Playwright');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await open(page);
+  await page.getByRole('button', { name: 'Parents' }).click();
+  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
+  await page.locator('.gate input').fill(String(a * b));
+  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: /Copy question for AI/ }).click();
+  await expect(page.locator('#ocr-status')).toContainText('Copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('exact words');
+  await page.evaluate(() => navigator.clipboard.writeText('**Sam has a red\nball.**'));
+  await page.getByRole('button', { name: /Paste reply/ }).click();
+  await expect(page.locator('#book-text')).toHaveValue('Sam has a red ball.');
+});

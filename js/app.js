@@ -11,7 +11,7 @@ import { recognize, toCloud } from './digits.js';
 import { questionLang, L, VOICE, PRAISE, RETRY } from './lang.js';
 import { tokens, companion, chooseGuesses } from './follow.js';
 import { canListen, listen, LISTEN_LANG } from './listen.js';
-import { readPhoto } from './ocr.js';
+import { readPhoto, cleanText } from './ocr.js';
 
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
 // Screens where the play clock runs and the rest gate applies.
@@ -461,6 +461,9 @@ function parentScreen() {
       ${state.books.map((b) => `<div class="task"><span>${langTag(b.lang)} ${esc(b.title)}</span><button class="btn danger" data-act="delBook" data-arg="${b.id}">${tr('Delete', 'Padam')}</button></div>`).join('')}
       <label>${tr('Language', 'Bahasa')} <select id="book-lang">${BOOK_LANGS.map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label>
       <label class="btn">📷 ${tr('Photo of the page', 'Gambar muka surat')}<input id="book-photo" type="file" accept="image/*" hidden></label>
+      <p class="muted">${tr('Or ask an AI app (Gemini, ChatGPT…): copy the question, paste it there with the photo, copy its reply, then tap Paste reply.', 'Atau tanya aplikasi AI (Gemini, ChatGPT…): salin soalan, tampal di sana bersama gambar, salin jawapannya, kemudian tekan Tampal jawapan.')}</p>
+      <button class="btn" data-act="copyAsk">📋 ${tr('Copy question for AI', 'Salin soalan untuk AI')}</button>
+      <button class="btn" data-act="pasteReply">📥 ${tr('Paste reply', 'Tampal jawapan')}</button>
       <p class="muted" id="ocr-status">${tr('The words are read on this tablet; check them before adding.', 'Perkataan dibaca dalam tablet ini; semak dulu sebelum tambah.')}</p>
       <label>${tr('Title', 'Tajuk')} <input id="book-title" maxlength="40" placeholder="${tr('Page', 'Muka surat')} ${state.books.length + 1}"></label>
       <textarea id="book-text" rows="5" maxlength="2000" placeholder="${tr('Type or paste the words on the page', 'Taip atau tampal perkataan pada muka surat')}"></textarea>
@@ -588,6 +591,30 @@ function finishPage(b, res) {
   mic.dataset.act = 'read';
   mic.dataset.arg = b.id;
   mic.textContent = `🔁 ${tr('Read again', 'Baca lagi')}`;
+}
+
+// For an AI chat app: just the page's words back, so the reply can be pasted straight in.
+const AI_ASK = 'Copy the exact words printed on this book page, in reading order. Reply with only those words: no title of your own, no notes, no translation, no formatting. Keep the original language and spelling.';
+
+async function copyAsk() {
+  const status = app.querySelector('#ocr-status');
+  try {
+    await navigator.clipboard.writeText(AI_ASK);
+    status.textContent = tr('Copied. Paste it in the AI app with the photo.', 'Disalin. Tampal dalam aplikasi AI bersama gambar.');
+  } catch {
+    status.textContent = AI_ASK; // no clipboard access: show it to copy by hand
+  }
+}
+
+async function pasteReply() {
+  const box = app.querySelector('#book-text');
+  try {
+    const text = await navigator.clipboard.readText();
+    // AI replies may add markdown; strip it like OCR text.
+    box.value = cleanText(text.replace(/[*_#`>]/g, ''), app.querySelector('#book-lang').value).slice(0, 2000);
+  } catch {
+    box.focus(); // no clipboard access: he pastes with a long press instead
+  }
 }
 
 function addBook() {
@@ -1026,6 +1053,8 @@ const ACTIONS = {
   mic: () => toggleMic(),
   hear: (_, el) => speak(el.textContent, VOICE[bookById(view.bookId).lang]),
   addBook: () => addBook(),
+  copyAsk: () => copyAsk(),
+  pasteReply: () => pasteReply(),
   delBook: (id) => {
     if (!confirm(tr('Delete this page?', 'Padam muka surat ini?'))) return;
     state.books = state.books.filter((b) => b.id !== id);
