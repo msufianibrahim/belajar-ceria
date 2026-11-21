@@ -95,7 +95,9 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
    `state.books`, `state.reads` (last red count). **No coins for reading** — user decided
    (2026-11-15): not for now. **Photo of the page** (js/ocr.js): Tesseract.js 5.1.1 from jsDelivr, on-device
    (msa / eng / chi_sim), fills the text box for the parent to check — user found typing too tedious.
-   Next: he tries it on the tablet.
+   User found OCR unreliable (2026-11-21), so the parent panel also has "Copy question for AI"
+   (a prompt for Gemini/ChatGPT asking for the page's exact words) and "Paste reply" (reads the
+   clipboard into the text box, markdown stripped). Next: he tries it on the tablet.
 2. Wished for by the content drafters: a "read the passage aloud" button, a decimal number pad,
    language-aware choice labels for Maths (months, shape names).
 
