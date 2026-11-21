@@ -91,8 +91,8 @@ test('answer mode: choices to learn, number pad once an add/subtract level is pa
   assert.equal(answerMode(fromJson({ levels: { 'math-count5': rec() } }), count5), 'choose');
 });
 
-test('number pad is used on the addition and subtraction levels only', () => {
-  assert.deepEqual(math.levels.filter((l) => l.typed).map((l) => l.id),
+test('number pad is used on the preschool addition and subtraction levels only (year levels add their own)', () => {
+  assert.deepEqual(math.levels.filter((l) => l.typed && !l.year).map((l) => l.id),
     ['math-add5', 'math-sub5', 'math-add10', 'math-sub10', 'math-add9', 'math-add20', 'math-sub20']);
 });
 

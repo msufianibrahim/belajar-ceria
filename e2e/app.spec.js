@@ -47,10 +47,10 @@ async function answerWrong(page) {
 const coins = (page) => page.locator('.coins');
 const placed = { placed: { math: true } };
 
-test('home: all subjects open except Islamic Studies (coming soon)', async ({ page }) => {
+test('home: all subjects open', async ({ page }) => {
   await open(page);
   await expect(page.getByRole('button', { name: /Maths/ })).toBeEnabled();
-  await expect(page.locator('.tile.locked')).toHaveCount(1);
+  await expect(page.locator('.tile.locked')).toHaveCount(0);
   await expect(coins(page)).toHaveText('🪙 0');
 });
 
@@ -353,7 +353,7 @@ test('passing Add within 5 opens Add within 10 straight away', async ({ page }) 
 test('Iqra: opens up to Dhammah terbalik without a quiz; a round can be completed', async ({ page }) => {
   await open(page);
   await page.getByRole('button', { name: /Iqra/ }).click();
-  await expect(page.locator('.level:not(.locked)')).toHaveCount(9);
+  await expect(page.locator('.level:not(.locked)')).toHaveCount(20);
   await expect(levelButton(page, 'Mix: a, i, u')).toBeDisabled();
   await levelButton(page, 'Dhammah terbalik').click();
   await expect(page.locator('.speak')).toContainText('Read it aloud!');

@@ -24,6 +24,7 @@ const FILES = [
   'js/subjects/en.js',
   'js/subjects/zh.js',
   'js/subjects/jawi.js',
+  'js/subjects/islam.js',
   'js/follow.js',
   'js/listen.js',
   'js/ocr.js',

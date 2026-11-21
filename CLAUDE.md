@@ -9,7 +9,15 @@ and how to work on it. README.md has the general architecture.
 - Subjects: Maths, BM, English, 华文, Iqra, Jawi, Asas Islam. Built: **Maths**, **Iqra** (1, 3, 4–5 parts),
   **BM**, **English**, **华文**, **Jawi** (the last four ported from the JejakJaya curriculum,
   2026-11-15: listen / look / read-aloud levels; no speech recognition, no handwriting for letters).
-  Asas Islam not started.
+  **Asas Islam** (js/subjects/islam.js, 2026-11-21, Malay, multiple choice).
+- **Curriculum to age 12 (2026-11-21):** every subject now runs preschool → KSSR Tahun 1–6
+  (Maths +41, BM +38, English +42, 华文 +33, Jawi +30, Asas Islam 36, Iqra +22 incl. rest of
+  Iqra 1–2 and Iqra 6). Levels carry `year: N`; the level list shows Preschool / Year N headings
+  (levels without `year` = preschool). Years must not go down (test). Sticker emoji are unique
+  across all subjects (test); each subject has its own emoji family. Content was drafted by
+  subagents and spot-checked, not yet checked by a teacher. Known doubts: zh maths terms
+  (令吉/仙 etc.), Iqra 6 order from memory, BM/zh idiom paraphrases. Maths year levels are
+  `probe: false` with `needs:` chains per strand; the number pad takes up to 7 digits.
 - Free, no backend: vanilla-JS ES-module PWA, no build step, progress in localStorage
   (key `belajar-ceria-v1`). Repo github.com/msufianibrahim/belajar-ceria (public),
   live at https://msufianibrahim.github.io/belajar-ceria/ (GitHub Pages from `main`).
@@ -88,8 +96,8 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
    (2026-11-15): not for now. **Photo of the page** (js/ocr.js): Tesseract.js 5.1.1 from jsDelivr, on-device
    (msa / eng / chi_sim), fills the text box for the parent to check — user found typing too tedious.
    Next: he tries it on the tablet.
-2. The rest of Iqra 1–2.
-3. Asas Islam — not started.
+2. Wished for by the content drafters: a "read the passage aloud" button, a decimal number pad,
+   language-aware choice labels for Maths (months, shape names).
 
 ## Code map / gotchas
 - js/app.js: all screens (string templates re-rendered via `render()`), actions via

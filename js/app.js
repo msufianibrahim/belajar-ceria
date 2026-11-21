@@ -199,8 +199,13 @@ function practiceGate(subjectId) {
 function subjectScreen() {
   const s = subjectById(view.subjectId);
   const gate = practiceGate(s.id);
+  const staged = s.levels.some((l) => l.year);
   const items = s.levels.map((l, i) => {
     const r = state.levels[l.id];
+    // School-year headings (KSSR Tahun 1–6); levels without a year come first, as preschool.
+    const yr = l.year ?? 0;
+    const head = staged && (i === 0 || yr !== (s.levels[i - 1].year ?? 0))
+      ? `<li class="stage">${yr ? tr(`Year ${yr}`, `Tahun ${yr}`) : tr('Preschool', 'Prasekolah')}</li>` : '';
     const waiting = gate && isOpen(state, s, i) && !gate.has(l.id);
     const locked = !isOpen(state, s, i) || waiting;
     const badge = waiting ? '🎯' : locked ? '🔒' : r?.mastered ? '👑' : i + 1;
@@ -211,7 +216,7 @@ function subjectScreen() {
     const coinTag = pays ? `<span class="tag coin">🪙 ${pays}</span>` : '';
     const paused = state.paused?.[l.id];
     const pausedTag = paused && !locked ? `<span class="tag">▶️ ${paused.i}/${paused.qs.length}</span>` : '';
-    return `<li><button class="level ${locked ? 'locked' : ''} ${waiting ? 'waiting' : ''} ${gate?.has(l.id) ? 'today' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
+    return `${head}<li><button class="level ${locked ? 'locked' : ''} ${waiting ? 'waiting' : ''} ${gate?.has(l.id) ? 'today' : ''} ${r?.mastered ? 'mastered' : ''}" ${locked ? 'disabled' : ''} data-act="play" data-arg="${i}">
       <span class="lvl-num">${badge}</span>
       <span class="lvl-title">${s.arabic ? `<span class="ar lvl-ar">${l.icon}</span>` : l.icon} ${N(l.title)} ${zh} ${pausedTag} ${coinTag} ${toward}</span>
       <span class="stars">${medalCount(r?.rounds) ? `<span class="lvl-medal">${MEDALS[medalCount(r.rounds) - 1]}</span>` : ''}${stars(r?.best ?? 0, ROUND)}</span>
@@ -745,7 +750,7 @@ function answer(k, el) {
 
 // Number pad: up to 2 digits, then ✓.
 function typeKey(d) {
-  if (view.busy || view.typed.length >= 2) return;
+  if (view.busy || view.typed.length >= 7) return;
   view.typed += d;
   app.querySelector('.typed').textContent = view.typed;
 }
