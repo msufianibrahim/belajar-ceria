@@ -18,7 +18,9 @@ const defaults = () => ({
   practiceDay: { date: '', rounds: 0, paid: false },
   paused: {},                   // levelId -> a round stopped halfway (see app.js saveRound)
   ink: {},                      // digit -> his own handwriting templates (see app.js learnInk)
-  books: [],                    // reading companion pages the parent added: { id, title, lang, text }
+  books: [],                    // reading companion books: { id, title, lang, pages: [{ id, text }] }
+  addingTo: null,               // book id a page is being added to (the AI's shared reply comes back here)
+  inRound: null,                // level id of the round on screen, so a refresh goes back into it
   reads: {},                    // page id -> { date, red } of his last full read (red = words he needed to hear)
   session: { usedMs: 0, lastActive: 0, restUntil: 0 },
 });

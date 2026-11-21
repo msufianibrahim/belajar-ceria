@@ -577,28 +577,51 @@ const fakeMic = (page) => page.addInitScript(() => {
   };
 });
 
-test('parent adds a book page; it shows on home for reading', async ({ page }) => {
+const SAM = { id: 'k1', title: 'Sam', lang: 'en', pages: [{ id: 'b1', text: 'Sam has a big red ball. He kicks it.' }, { id: 'b2', text: 'The ball goes up.' }] };
+
+test('anyone can make a book and add pages to it from home, no gate', async ({ page }) => {
   await open(page);
-  await expect(page.locator('.big-btn.books')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Parents' }).click();
-  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
-  await page.locator('.gate input').fill(String(a * b));
-  await page.getByRole('button', { name: 'Enter' }).click();
-  await page.locator('#book-title').fill('Sam');
-  await page.locator('#book-lang').selectOption('en');
-  await page.locator('#book-text').fill('Sam has a big red ball.');
-  await page.getByRole('button', { name: /Add page/ }).click();
-  await expect(page.locator('[data-act="delBook"]')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Back', exact: true }).click();
   await page.locator('.big-btn.books').click();
-  await expect(page.locator('.big-btn.book')).toContainText('Sam');
+  await page.locator('.book-card.new').click();
+  await page.locator('#book-title').fill('Sam');
+  await page.getByRole('button', { name: 'English' }).click();
+  await page.getByRole('button', { name: /add the first page/ }).click();
+  await page.getByRole('button', { name: /Save page/ }).click();
+  await expect(page.locator('#ocr-status')).toContainText('words on the page');
+  await page.locator('#book-text').fill('Sam has a big red ball.');
+  await page.getByRole('button', { name: /Save page/ }).click();
+  await expect(page.locator('.big-btn.page')).toHaveCount(1);
+  await page.getByRole('button', { name: /Add a page/ }).click();
+  await page.locator('#book-text').fill('He kicks it.');
+  await page.getByRole('button', { name: /Save page/ }).click();
+  await expect(page.locator('.big-btn.page')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.locator('.book-card').first()).toContainText('2 pages');
+  const books = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)).books, KEY);
+  expect(books[0]).toMatchObject({ title: 'Sam', lang: 'en' });
+  expect(books[0].pages.map((p) => p.text)).toEqual(['Sam has a big red ball.', 'He kicks it.']);
+});
+
+test('deleting pages needs the parent gate', async ({ page }) => {
+  page.on('dialog', (d) => d.accept());
+  await open(page, { books: [SAM] });
+  await page.locator('.big-btn.books').click();
+  await page.locator('.book-card').first().click();
+  await expect(page.locator('[data-act="delPage"]')).toHaveCount(0);
+  await page.getByRole('button', { name: /Delete pages/ }).click();
+  await parentArea(page);
+  await page.locator('[data-act="delPage"]').first().click();
+  await expect(page.locator('.big-btn.page')).toHaveCount(1);
+  await page.getByRole('button', { name: /Delete the whole book/ }).click();
+  await expect(page.locator('.book-card:not(.new)')).toHaveCount(0);
 });
 
 test('reading companion: missed word turns orange, then red if he reads on; only red words can be tapped', async ({ page }) => {
   await fakeMic(page);
-  await open(page, { books: [{ id: 'b1', title: 'Sam', lang: 'en', text: 'Sam has a big red ball. He kicks it.' }] });
+  await open(page, { books: [SAM] });
   await page.locator('.big-btn.books').click();
-  await page.locator('.big-btn.book').click();
+  await page.locator('.book-card').first().click();
+  await page.locator('.big-btn.page').first().click();
   await expect(page.locator('.reading [data-w]')).toHaveCount(9);
   await page.locator('.mic').click();
   await page.evaluate(() => window.__hear(['Sam has a red']));
@@ -611,34 +634,14 @@ test('reading companion: missed word turns orange, then red if he reads on; only
   await expect(page.locator('.reading [data-w="3"]')).toHaveClass(/red/);
   await expect(page.locator('.reading [data-act="hear"]')).toHaveCount(1);
   await expect(page.locator('.read-status')).toContainText('whole page');
-  await expect(page.locator('.mic')).toContainText('Read again');
-  const reads = await page.evaluate(() => JSON.parse(localStorage.getItem('belajar-ceria-v1')).reads);
+  const reads = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)).reads, KEY);
   expect(reads.b1.red).toBe(1);
   await page.screenshot({ path: 'test-results/reading.png' });
-});
-
-test.describe(() => {
-// The app's service worker would fetch the OCR script itself, out of page.route's reach.
-test.use({ serviceWorkers: 'block' });
-test('a photo of the page fills in its words for the parent to check', async ({ page }) => {
-  // Stand-in for the OCR library from the CDN.
-  const ocrText = JSON.stringify('Bola itu ber-\nwarna merah.');
-  await page.route('**/tesseract.min.js', (r) => r.fulfill({ contentType: 'text/javascript', body: `window.Tesseract = { createWorker: async () => ({
-    recognize: async () => ({ data: { text: ${ocrText} } }), terminate: async () => {} }) };` }));
-  await open(page);
-  await page.getByRole('button', { name: 'Parents' }).click();
-  const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
-  await page.locator('.gate input').fill(String(a * b));
-  await page.getByRole('button', { name: 'Enter' }).click();
-  await page.locator('#book-lang').selectOption('ms');
-  const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 40; return c.toDataURL('image/png').split(',')[1]; }), 'base64');
-  await page.locator('#book-photo').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: png });
-  await page.getByRole('button', { name: /Read photo on this tablet/ }).click();
-  await expect(page.locator('#book-text')).toHaveValue('Bola itu berwarna merah.');
-  await page.getByRole('button', { name: /Add page/ }).click();
-  await expect(page.locator('[data-act="delBook"]')).toHaveCount(1);
-  await expect(page.locator('.task', { has: page.locator('[data-act="delBook"]') })).toContainText('Page 1');
-});
+  // The big button now goes to the next page.
+  await page.locator('.mic').click();
+  await expect(page.locator('.reading')).toContainText('The ball goes up.');
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.locator('.big-btn.page').first()).toContainText('🔴 1');
 });
 
 async function parentArea(page) {
@@ -647,30 +650,66 @@ async function parentArea(page) {
   await page.getByRole('button', { name: 'Enter' }).click();
 }
 
-test('a page photo goes to an AI app through the share sheet, with the question', async ({ page }) => {
-  await open(page);
+async function addPageOf(page) {
+  await page.locator('.big-btn.books').click();
+  await page.locator('.book-card').first().click();
+  await page.getByRole('button', { name: /Add a page/ }).click();
+}
+
+test.describe(() => {
+// The app's service worker would fetch the OCR script itself, out of page.route's reach.
+test.use({ serviceWorkers: 'block' });
+test('a photo of the page can be read on the tablet', async ({ page }) => {
+  // Stand-in for the OCR library from the CDN.
+  const ocrText = JSON.stringify('Bola itu ber-\nwarna merah.');
+  await page.route('**/tesseract.min.js', (r) => r.fulfill({ contentType: 'text/javascript', body: `window.Tesseract = { createWorker: async () => ({
+    recognize: async () => ({ data: { text: ${ocrText} } }), terminate: async () => {} }) };` }));
+  await open(page, { books: [{ ...SAM, lang: 'ms' }] });
+  await addPageOf(page);
+  const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 40; return c.toDataURL('image/png').split(',')[1]; }), 'base64');
+  await page.locator('#book-photo').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: png });
+  await page.getByRole('button', { name: /read it on this tablet/ }).click();
+  await expect(page.locator('#book-text')).toHaveValue('Bola itu berwarna merah.');
+  await page.getByRole('button', { name: /Save page/ }).click();
+  await expect(page.locator('.big-btn.page')).toHaveCount(3);
+});
+});
+
+test('a page photo goes to an AI app through the share sheet; its reply shared back fills the page', async ({ page }) => {
+  await open(page, { books: [SAM] });
   await page.evaluate(() => {
     navigator.canShare = () => true;
     navigator.share = async (d) => { window.__shared = { files: d.files.map((f) => f.name), text: d.text }; };
   });
-  await page.getByRole('button', { name: 'Parents' }).click();
-  await parentArea(page);
-  await page.getByRole('button', { name: /Send photo to AI app/ }).click();
-  await expect(page.locator('#ocr-status')).toContainText('photo of the page first');
+  await addPageOf(page);
+  await expect(page.locator('[data-act="shareAi"]')).toHaveCount(0); // only once there's a photo
+  await page.locator('#book-text').fill('half typed');
   await page.locator('#book-photo').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: Buffer.from('x') });
-  await page.getByRole('button', { name: /Send photo to AI app/ }).click();
+  await expect(page.locator('#book-text')).toHaveValue('half typed'); // a new photo keeps the words
+  await page.getByRole('button', { name: /Ask AI for the words/ }).click();
   await expect(page.locator('#ocr-status')).toContainText('Sent');
   const sent = await page.evaluate(() => window.__shared);
   expect(sent.files).toEqual(['page.png']);
   expect(sent.text).toContain('exact words');
+  // The AI app shares its reply to Belajar Ceria: it opens on the same book's new page.
+  await page.goto('/?test&text=' + encodeURIComponent('**The ball\ngoes down.**\nhttps://g.co/gemini/share/abc'));
+  await expect(page.locator('#book-text')).toHaveValue('The ball goes down.');
+  await page.getByRole('button', { name: /Save page/ }).click();
+  await expect(page.locator('.big-btn.page')).toHaveCount(3);
 });
 
-test("the AI's reply shared back into the app fills the new page, after the parent gate", async ({ page }) => {
-  await page.goto('/?test&text=' + encodeURIComponent('**Sam has a red\nball.**\nhttps://g.co/gemini/share/abc'));
-  await expect(page.locator('.gate')).toBeVisible();
-  await parentArea(page);
-  await expect(page.locator('#book-text')).toHaveValue('Sam has a red ball.');
-  await page.getByRole('button', { name: /Add page/ }).click();
-  await expect(page.locator('[data-act="delBook"]')).toHaveCount(1);
-  await expect(page.locator('#book-text')).toHaveValue('');
+test('refreshing mid-round goes straight back to the same question', async ({ page }) => {
+  await open(page, placed);
+  await page.getByRole('button', { name: /Maths/ }).click();
+  await levelButton(page, 'Count 1–5').click();
+  for (let i = 0; i < 3; i++) await answerRight(page);
+  await expect(page.locator('.dots .done')).toHaveCount(3);
+  await page.reload();
+  await expect(page.locator('.dots .done')).toHaveCount(3);
+  await expect(page.locator('.dots .now')).toHaveCount(1);
+  // Leaving the round: a refresh then stays on home.
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await page.reload();
+  await expect(page.locator('.big-btn.continue')).toBeVisible();
 });

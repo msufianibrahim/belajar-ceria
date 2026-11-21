@@ -15,7 +15,7 @@ import { readPhoto, cleanText } from './ocr.js';
 
 const PLACEMENT_PER_LEVEL = 2;  // placement questions asked per level
 // Screens where the play clock runs and the rest gate applies.
-const KID_SCREENS = new Set(['home', 'subject', 'play', 'placement', 'results', 'stickers', 'shop', 'books', 'reading']);
+const KID_SCREENS = new Set(['home', 'subject', 'play', 'placement', 'results', 'stickers', 'shop', 'books', 'book', 'reading']);
 
 const app = document.getElementById('app');
 let state = load();
@@ -61,6 +61,8 @@ function go(name, data = {}) {
     return false;
   }
   view = { name, ...data };
+  const inRound = name === 'play' ? subjectById(data.subjectId).levels[data.levelIdx].id : null;
+  if ((state.inRound ?? null) !== inRound) { state.inRound = inRound; persist(); }
   render();
   return true;
 }
@@ -70,7 +72,7 @@ function render() {
     home: homeScreen, subject: subjectScreen, play: questionScreen, placement: questionScreen,
     results: resultsScreen, stickers: stickersScreen, shop: shopScreen,
     sleepy: sleepyScreen, gate: gateScreen, parent: parentScreen,
-    books: booksScreen, reading: readingScreen,
+    books: booksScreen, book: bookScreen, newBook: newBookScreen, addPage: addPageScreen, reading: readingScreen,
   };
   document.documentElement.lang = state.settings.lang;
   app.innerHTML = screens[view.name]();
@@ -181,7 +183,7 @@ function homeScreen() {
     ${practiceCard()}
     <section class="subjects">${tiles}</section>
     ${pickReview(state, SUBJECTS, todayKey()) ? `<button class="big-btn review" data-act="review">🔁 ${tr('Review', 'Ulang kaji')} <small>— 👑 = 🪙 ${COINS.mastery}</small></button>` : ''}
-    ${state.books.length ? `<button class="big-btn books" data-act="go" data-arg="books">📚 ${tr('Read a book', 'Baca buku')}</button>` : ''}
+    <button class="big-btn books" data-act="go" data-arg="books">📚 ${tr('Read a book', 'Baca buku')}</button>
     <nav class="bottom">
       <button class="big-btn" data-act="go" data-arg="stickers">📒 ${tr('Stickers', 'Pelekat')} <b>${state.stickers.length}</b></button>
       <button class="big-btn" data-act="go" data-arg="shop">🛍️ ${tr('Shop', 'Kedai')}</button>
@@ -456,20 +458,6 @@ function parentScreen() {
           `<option value="${l.id}" ${state.settings.practice?.[k] === l.id ? 'selected' : ''}>${N(l.title)}</option>`).join('')}</optgroup>`).join('')}
       </select></label>`).join('') : ''}
     </section>
-    <section class="panel"><h3>📚 ${tr('Reading companion', 'Teman membaca')}</h3>
-      <p class="muted">${tr('Add a page from his book. He reads it aloud and the tablet follows along: a missed word turns orange (one more try), then red; only red words can be tapped to hear them. Needs internet; the audio goes to Google or Apple; speech recognition is built for adult voices.', 'Tambah muka surat dari bukunya. Dia baca dengan kuat dan tablet mengikut: perkataan tertinggal jadi jingga (cuba sekali lagi), kemudian merah; hanya perkataan merah boleh ditekan untuk didengar. Perlu internet; audio dihantar ke Google atau Apple; pengecaman suara dibina untuk suara dewasa.')}</p>
-      ${state.books.map((b) => `<div class="task"><span>${langTag(b.lang)} ${esc(b.title)}</span><button class="btn danger" data-act="delBook" data-arg="${b.id}">${tr('Delete', 'Padam')}</button></div>`).join('')}
-      <label>${tr('Language', 'Bahasa')} <select id="book-lang">${BOOK_LANGS.map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label>
-      <label class="btn">📷 ${tr('Photo of the page', 'Gambar muka surat')}<input id="book-photo" type="file" accept="image/*" hidden></label>
-      <button class="btn" data-act="shareAi">🤖 ${tr('Send photo to AI app', 'Hantar gambar ke aplikasi AI')}</button>
-      <button class="btn" data-act="ocr">🔍 ${tr('Read photo on this tablet', 'Baca gambar dalam tablet ini')}</button>
-      <button class="btn" data-act="pasteReply">📥 ${tr('Paste reply', 'Tampal jawapan')}</button>
-      <p class="muted" id="ocr-status">${shared ? tr('Words from the AI app: pick the language, check them, then tap Add page.', 'Perkataan dari aplikasi AI: pilih bahasa, semak, kemudian tekan Tambah.')
-        : tr('Take a photo, then send it to an AI app (Gemini, ChatGPT…). Share its reply back to Belajar Ceria, or copy it and tap Paste reply.', 'Ambil gambar, kemudian hantar ke aplikasi AI (Gemini, ChatGPT…). Kongsi jawapannya ke Belajar Ceria, atau salin dan tekan Tampal jawapan.')}</p>
-      <label>${tr('Title', 'Tajuk')} <input id="book-title" maxlength="40" placeholder="${tr('Page', 'Muka surat')} ${state.books.length + 1}"></label>
-      <textarea id="book-text" rows="5" maxlength="2000" placeholder="${tr('Type or paste the words on the page', 'Taip atau tampal perkataan pada muka surat')}">${esc(shared ?? '')}</textarea>
-      <button class="btn" data-act="addBook">➕ ${tr('Add page', 'Tambah muka surat')}</button>
-    </section>
     <section class="panel"><h3>${tr('Real-world rewards', 'Hadiah dunia sebenar')}</h3>
       <p class="muted">${tr('Give a sticker when your child does these with you.', 'Beri pelekat bila anak buat aktiviti ini bersama anda.')}</p>${tasks}
     </section>
@@ -483,35 +471,88 @@ function parentScreen() {
 }
 
 // ---------------------------------------------------------------- reading companion
+// Books hold pages in order. Anyone can add a book or a page; deleting needs the parent gate.
 
 const BOOK_LANGS = [['ms', 'Bahasa Melayu', 'BM'], ['en', 'English', 'EN'], ['zh', '华文', '华']];
 const langTag = (lang) => `<b class="lang-tag">${BOOK_LANGS.find(([v]) => v === lang)?.[2] ?? ''}</b>`;
 const bookById = (id) => state.books.find((b) => b.id === id);
+const pageCount = (b) => tr(`${b.pages.length} ${b.pages.length === 1 ? 'page' : 'pages'}`, `${b.pages.length} muka surat`);
 
 // The page's words as written, each with its index among the words he must read
 // (-1 for punctuation). Mandarin goes character by character.
-function pageWords(b) {
+function pageWords(lang, text) {
   let k = 0;
-  if (b.lang === 'zh') return [...b.text].filter((ch) => ch.trim()).map((w) => ({ w, k: /\p{Script=Han}/u.test(w) ? k++ : -1 }));
-  return b.text.split(/\s+/).filter(Boolean).map((w) => ({ w, k: tokens(w, LISTEN_LANG[b.lang]).length ? k++ : -1 }));
+  if (lang === 'zh') return [...text].filter((ch) => ch.trim()).map((w) => ({ w, k: /\p{Script=Han}/u.test(w) ? k++ : -1 }));
+  return text.split(/\s+/).filter(Boolean).map((w) => ({ w, k: tokens(w, LISTEN_LANG[lang]).length ? k++ : -1 }));
 }
 
 function booksScreen() {
-  const items = state.books.map((b) => {
-    const r = state.reads[b.id];
-    const last = r ? `<small>${r.red ? `✓ 🔴 ${r.red}` : '✓ ⭐'}</small>` : '';
-    return `<button class="big-btn book" data-act="read" data-arg="${b.id}">${langTag(b.lang)} ${esc(b.title)} ${last}</button>`;
+  const cards = state.books.map((b) => `<button class="book-card" data-act="openBook" data-arg="${b.id}">
+      ${langTag(b.lang)}<span class="book-title">${esc(b.title)}</span><small>${pageCount(b)}</small></button>`).join('');
+  return `${topBar(`📚 ${tr('Books', 'Buku')}`)}
+    <section class="shelf">${cards}
+      <button class="book-card new" data-act="go" data-arg="newBook">➕<span class="book-title">${tr('New book', 'Buku baru')}</span></button>
+    </section>
+    <p class="muted center">${tr('He reads aloud and the tablet listens: a missed word turns orange (one more try), then red. Tap a red word to hear it. Needs internet; the audio goes to Google or Apple.', 'Dia baca dengan kuat dan tablet mendengar: perkataan tertinggal jadi jingga (cuba sekali lagi), kemudian merah. Tekan perkataan merah untuk dengar. Perlu internet; audio dihantar ke Google atau Apple.')}</p>`;
+}
+
+function newBookScreen() {
+  const lang = view.lang ?? 'ms';
+  return `${topBar(tr('New book', 'Buku baru'))}
+    <section class="panel form">
+      <label class="field">${tr('Book name', 'Nama buku')}<input id="book-title" maxlength="40" value="${esc(view.title ?? '')}" placeholder="${tr('My book', 'Buku saya')}"></label>
+      <p class="field">${tr('Language', 'Bahasa')}</p>
+      <div class="lang-pick">${BOOK_LANGS.map(([v, name]) => `<button class="big-btn ${v === lang ? 'on' : ''}" data-act="bookLang" data-arg="${v}">${name}</button>`).join('')}</div>
+      <button class="big-btn primary" data-act="createBook">${tr('Next: add the first page', 'Seterusnya: tambah muka surat pertama')} ➡️</button>
+    </section>`;
+}
+
+function bookScreen() {
+  const b = bookById(view.bookId);
+  const pages = b.pages.map((p, i) => {
+    const r = state.reads[p.id];
+    const mark = r ? (r.red ? `🔴 ${r.red}` : '⭐') : '';
+    return `<div class="page-tile">
+      <button class="big-btn page" data-act="read" data-arg="${i}">${i + 1}<small>${mark}</small></button>
+      ${view.editing ? `<button class="btn danger" data-act="delPage" data-arg="${p.id}" aria-label="${tr('Delete page', 'Padam muka surat')} ${i + 1}">✕</button>` : ''}
+    </div>`;
   }).join('');
-  return `${topBar(`📚 ${tr('Read a book', 'Baca buku')}`)}<section class="book-list">${items}</section>`;
+  return `${topBar(`${langTag(b.lang)} ${esc(b.title)}`)}
+    <section class="pages">${pages}</section>
+    <button class="big-btn primary" data-act="addPage">➕ ${tr('Add a page', 'Tambah muka surat')}</button>
+    ${view.editing
+      ? `<button class="btn danger" data-act="delBook">🗑 ${tr('Delete the whole book', 'Padam seluruh buku')}</button>
+         <button class="btn" data-act="openBook" data-arg="${b.id}">${tr('Done', 'Siap')}</button>`
+      : `<button class="btn subtle" data-act="editBook">🗑 ${tr('Delete pages…', 'Padam muka surat…')}</button>`}`;
+}
+
+// Three steps on one screen: photo, words, save. The photo is optional: he can type or paste.
+function addPageScreen() {
+  const b = bookById(view.bookId);
+  const step = (n, title, body) => `<section class="panel step"><h3><span class="step-num">${n}</span> ${title}</h3>${body}</section>`;
+  return `${topBar(`${esc(b.title)} · ${tr('page', 'muka surat')} ${b.pages.length + 1}`)}
+    ${step(1, tr('Take a photo of the page', 'Ambil gambar muka surat'), `
+      <label class="big-btn photo-btn">${view.photoUrl ? `<img src="${view.photoUrl}" alt="">` : '📷'} ${view.photoUrl ? tr('Change photo', 'Tukar gambar') : tr('Photo', 'Gambar')}<input id="book-photo" type="file" accept="image/*" hidden></label>
+      ${view.photoUrl ? `<div class="row">
+        <button class="big-btn primary" data-act="shareAi">🤖 ${tr('Ask AI for the words', 'Minta AI salin perkataan')}</button>
+        <button class="btn" data-act="ocr">🔍 ${tr('Or read it on this tablet', 'Atau baca dalam tablet ini')}</button></div>` : ''}`)}
+    ${step(2, tr('Check the words', 'Semak perkataan'), `
+      <p class="muted" id="ocr-status">${esc(view.note ?? tr('The AI\'s reply comes here: share it back to Belajar Ceria, or copy it and tap Paste. You can also type.', 'Jawapan AI masuk ke sini: kongsi semula ke Belajar Ceria, atau salin dan tekan Tampal. Boleh juga taip.'))}</p>
+      <textarea id="book-text" rows="6" maxlength="2000" lang="${b.lang}" placeholder="${tr('The words on the page', 'Perkataan pada muka surat')}">${esc(view.draft ?? '')}</textarea>
+      <button class="btn" data-act="pasteReply">📥 ${tr('Paste', 'Tampal')}</button>`)}
+    ${step(3, tr('Save', 'Simpan'), `<button class="big-btn primary" data-act="savePage">✅ ${tr('Save page', 'Simpan muka surat')}</button>`)}`;
 }
 
 function readingScreen() {
   const b = bookById(view.bookId);
-  const words = pageWords(b).map(({ w, k }) => `<span${k >= 0 ? ` data-w="${k}"` : ''}>${esc(w)}</span>`).join(b.lang === 'zh' ? '' : ' ');
-  return `${topBar(esc(b.title))}
+  const i = view.page;
+  const words = pageWords(b.lang, b.pages[i].text).map(({ w, k }) => `<span${k >= 0 ? ` data-w="${k}"` : ''}>${esc(w)}</span>`).join(b.lang === 'zh' ? '' : ' ');
+  const nav = (to, label) => (to >= 0 && to < b.pages.length ? `<button class="btn" data-act="read" data-arg="${to}">${label}</button>` : '<span></span>');
+  return `${topBar(`${esc(b.title)} · ${i + 1}/${b.pages.length}`)}
     <section class="reading ${b.lang === 'zh' ? 'zh' : ''}" lang="${b.lang}">${words}</section>
     <p class="read-status" aria-live="polite">${canListen ? tr('Tap 🎤 and read the page aloud.', 'Tekan 🎤 dan baca dengan kuat.') : tr("This browser can't listen. Use Chrome or Edge.", 'Pelayar ini tak boleh mendengar. Guna Chrome atau Edge.')}</p>
-    <button class="big-btn mic" data-act="mic" ${canListen ? '' : 'disabled'}>🎤 ${tr('Start reading', 'Mula baca')}</button>`;
+    <button class="big-btn mic" data-act="mic" ${canListen ? '' : 'disabled'}>🎤 ${tr('Start reading', 'Mula baca')}</button>
+    <nav class="page-nav">${nav(i - 1, `◀ ${tr('Page', 'Muka surat')} ${i}`)}${nav(i + 1, `${tr('Page', 'Muka surat')} ${i + 2} ▶`)}</nav>`;
 }
 
 const READ_ERRORS = {
@@ -557,7 +598,7 @@ function updateReading(status = true) {
   if (view.name !== 'reading' || view.finished) return;
   const b = bookById(view.bookId);
   const l = LISTEN_LANG[b.lang];
-  const expected = tokens(b.text, l);
+  const expected = tokens(b.pages[view.page].text, l);
   const { heard } = chooseGuesses(expected, (view.phrases ?? []).map((alts) => alts.map((a) => tokens(a, l))));
   const res = companion(expected, [...heard, ...tokens(view.interim ?? '', l)]);
   for (const el of app.querySelectorAll('.reading [data-w]')) {
@@ -582,78 +623,92 @@ function finishPage(b, res) {
   stopListening();
   view.finished = true;
   const red = res.state.filter((s) => s === 'red').length;
-  state.reads[b.id] = { date: todayKey(), red };
+  state.reads[b.pages[view.page].id] = { date: todayKey(), red };
   persist();
   chime('right');
   say(tr('Well done! You read the whole page!', 'Hebat! Habis baca satu muka surat!'));
   readStatus(`🎉 ${tr('You read the whole page!', 'Habis baca satu muka surat!')}${red ? ` ${tr('Tap the red words to hear them.', 'Tekan perkataan merah untuk dengar.')}` : ''}`);
+  // The big button becomes the next step: the next page, or reading this one again.
+  const more = view.page + 1 < b.pages.length;
   const mic = app.querySelector('.mic');
   mic.classList.remove('on');
   mic.dataset.act = 'read';
-  mic.dataset.arg = b.id;
-  mic.textContent = `🔁 ${tr('Read again', 'Baca lagi')}`;
+  mic.dataset.arg = more ? view.page + 1 : view.page;
+  mic.textContent = more ? `➡️ ${tr('Next page', 'Muka surat seterusnya')}` : `🔁 ${tr('Read again', 'Baca lagi')}`;
+}
+
+function createBook() {
+  const title = (app.querySelector('#book-title').value.trim() || tr('My book', 'Buku saya')).slice(0, 40);
+  const b = { id: `k${Date.now()}`, title, lang: view.lang ?? 'ms', pages: [] };
+  state.books.push(b);
+  persist();
+  go('addPage', { bookId: b.id });
+}
+
+function savePage() {
+  const b = bookById(view.bookId);
+  const text = app.querySelector('#book-text').value.trim().slice(0, 2000);
+  if (!tokens(text, LISTEN_LANG[b.lang]).length) return note(tr('Put the words on the page in the box first.', 'Masukkan perkataan muka surat dalam kotak dulu.'));
+  b.pages.push({ id: `b${Date.now()}`, text });
+  state.addingTo = null;
+  persist();
+  go('book', { bookId: b.id });
 }
 
 // For an AI chat app: just the page's words back, so the reply can be pasted straight in.
 const AI_ASK = 'Copy the exact words printed on this book page, in reading order. Reply with only those words: no title of your own, no notes, no translation, no formatting. Keep the original language and spelling.';
 
-let photo = null;        // the page photo the parent picked, until it's sent or read
-let shared = null;       // words another app shared into Belajar Ceria (Web Share Target)
+let photo = null; // the page photo picked on the add-page screen
 
 // AI replies may add markdown and links; keep just the words.
 const tidyReply = (text, lang) => cleanText(text.replace(/https?:\/\/\S+/g, '').replace(/[*_#`>]/g, ''), lang).slice(0, 2000);
-const status = (t) => { const el = app.querySelector('#ocr-status'); if (el) el.textContent = t; };
-const needPhoto = () => status(tr('Take or pick a photo of the page first.', 'Ambil atau pilih gambar muka surat dulu.'));
+const note = (t) => { view.note = t; const el = app.querySelector('#ocr-status'); if (el) el.textContent = t; };
+
+function pickPhoto(file) {
+  if (!file) return;
+  photo = file;
+  if (view.photoUrl) URL.revokeObjectURL(view.photoUrl);
+  view.photoUrl = URL.createObjectURL(file);
+  render();
+}
 
 // The share sheet sends the photo and the question together, like sharing a receipt.
+// The reply comes back through the manifest's share_target, to the book in state.addingTo.
 async function shareAi() {
-  if (!photo) return needPhoto();
   const data = { files: [photo], text: AI_ASK };
+  state.addingTo = view.bookId;
+  persist();
   if (!navigator.canShare?.(data)) {
     try { await navigator.clipboard.writeText(AI_ASK); } catch {}
-    return status(tr("This browser can't share photos. The question is copied: paste it in the AI app with the photo.", 'Pelayar ini tak boleh kongsi gambar. Soalan sudah disalin: tampal dalam aplikasi AI bersama gambar.'));
+    return note(tr("This browser can't share photos. The question is copied: paste it in the AI app with the photo.", 'Pelayar ini tak boleh kongsi gambar. Soalan sudah disalin: tampal dalam aplikasi AI bersama gambar.'));
   }
   try {
     await navigator.share(data);
-    status(tr('Sent. When the AI answers, share its reply to Belajar Ceria, or copy it and tap Paste reply.', 'Dihantar. Bila AI jawab, kongsi jawapannya ke Belajar Ceria, atau salin dan tekan Tampal jawapan.'));
-  } catch {} // he closed the share sheet
+    note(tr('Sent! When the AI answers, share its reply to Belajar Ceria, or copy it and tap Paste.', 'Dihantar! Bila AI jawab, kongsi jawapannya ke Belajar Ceria, atau salin dan tekan Tampal.'));
+  } catch {} // the share sheet was closed
 }
 
 async function pasteReply() {
   const box = app.querySelector('#book-text');
   try {
-    box.value = tidyReply(await navigator.clipboard.readText(), app.querySelector('#book-lang').value);
+    box.value = view.draft = tidyReply(await navigator.clipboard.readText(), bookById(view.bookId).lang);
   } catch {
-    box.focus(); // no clipboard access: he pastes with a long press instead
+    box.focus(); // no clipboard access: paste with a long press instead
   }
 }
 
-function addBook() {
-  const titleEl = app.querySelector('#book-title');
-  const title = (titleEl.value.trim() || titleEl.placeholder).slice(0, 40);
-  const lang = app.querySelector('#book-lang').value;
-  const text = app.querySelector('#book-text').value.trim().slice(0, 2000);
-  if (!tokens(text, LISTEN_LANG[lang]).length) return alert(tr('Add the words on the page first.', 'Masukkan perkataan muka surat dulu.'));
-  state.books.push({ id: `b${Date.now()}`, title, lang, text });
-  shared = photo = null;
-  persist();
-  render();
-}
-
-// The photo's words go into the text box for the parent to check, not straight into a page.
-async function photoToText(file) {
-  if (!file) return;
-  const status = app.querySelector('#ocr-status');
-  const show = (t) => { if (status) status.textContent = t; };
-  show(tr('Reading the photo…', 'Sedang baca gambar…'));
+// The photo's words go into the text box to check, not straight into a page.
+async function photoToText() {
+  const lang = bookById(view.bookId).lang;
+  note(tr('Reading the photo…', 'Sedang baca gambar…'));
   try {
-    const text = await readPhoto(file, app.querySelector('#book-lang').value, (p) => show(`${tr('Reading the photo…', 'Sedang baca gambar…')} ${Math.round(p * 100)}%`));
+    const text = await readPhoto(photo, lang, (p) => note(`${tr('Reading the photo…', 'Sedang baca gambar…')} ${Math.round(p * 100)}%`));
     const box = app.querySelector('#book-text');
     if (!box) return;
-    box.value = text;
-    show(text ? tr('Done. Fix any wrong words, then tap Add page.', 'Siap. Betulkan perkataan yang salah, kemudian tekan Tambah.') : tr('No words found. Try a clearer, closer photo.', 'Tiada perkataan dijumpai. Cuba gambar yang lebih jelas dan dekat.'));
+    box.value = view.draft = text;
+    note(text ? tr('Done. Fix any wrong words, then save.', 'Siap. Betulkan perkataan yang salah, kemudian simpan.') : tr('No words found. Try a clearer, closer photo.', 'Tiada perkataan dijumpai. Cuba gambar yang lebih jelas dan dekat.'));
   } catch {
-    show(tr("Couldn't read the photo. Check the internet (needed the first time) and try again.", 'Tak dapat baca gambar. Semak internet (perlu kali pertama) dan cuba lagi.'));
+    note(tr("Couldn't read the photo. Check the internet (needed the first time) and try again.", 'Tak dapat baca gambar. Semak internet (perlu kali pertama) dan cuba lagi.'));
   }
 }
 
@@ -1025,7 +1080,8 @@ const ACTIONS = {
   go: (name) => go(name),
   back: () => {
     if (['play', 'results'].includes(view.name)) go('subject', { subjectId: view.subjectId });
-    else if (view.name === 'reading') go('books');
+    else if (['reading', 'addPage'].includes(view.name)) go('book', { bookId: view.bookId });
+    else if (['book', 'newBook'].includes(view.name)) go('books');
     else go('home');
   },
   subject: (id) => {
@@ -1061,19 +1117,34 @@ const ACTIONS = {
   del: () => typeDelete(),
   enter: () => typeEnter(),
   say: () => sayQuestion(),
-  read: (id) => go('reading', { bookId: id }),
+  openBook: (id) => go('book', { bookId: id }),
+  read: (i) => go('reading', { bookId: view.bookId, page: Number(i) }),
   mic: () => toggleMic(),
   hear: (_, el) => speak(el.textContent, VOICE[bookById(view.bookId).lang]),
-  addBook: () => addBook(),
+  bookLang: (lang) => { view.lang = lang; view.title = app.querySelector('#book-title').value; render(); },
+  createBook: () => createBook(),
+  addPage: () => { photo = null; go('addPage', { bookId: view.bookId }); },
+  savePage: () => savePage(),
   shareAi: () => shareAi(),
-  ocr: () => (photo ? photoToText(photo) : needPhoto()),
+  ocr: () => photoToText(),
   pasteReply: () => pasteReply(),
-  delBook: (id) => {
+  // Deleting needs the parent gate, then comes back to this book in delete mode.
+  editBook: () => go('gate', { a: 6 + Math.floor(Math.random() * 4), b: 6 + Math.floor(Math.random() * 4), then: { name: 'book', bookId: view.bookId, editing: true } }),
+  delPage: (id) => {
+    const b = bookById(view.bookId);
     if (!confirm(tr('Delete this page?', 'Padam muka surat ini?'))) return;
-    state.books = state.books.filter((b) => b.id !== id);
+    b.pages = b.pages.filter((p) => p.id !== id);
     delete state.reads[id];
     persist();
     render();
+  },
+  delBook: () => {
+    const b = bookById(view.bookId);
+    if (!confirm(tr(`Delete "${b.title}" and all its pages?`, `Padam "${b.title}" dan semua muka suratnya?`))) return;
+    for (const p of b.pages) delete state.reads[p.id];
+    state.books = state.books.filter((x) => x !== b);
+    persist();
+    go('books');
   },
   shopItem: (id) => shopTap(id),
   buyYes: () => buy(),
@@ -1107,9 +1178,12 @@ app.addEventListener('click', (e) => {
 app.addEventListener('submit', (e) => {
   e.preventDefault();
   const input = e.target.querySelector('input');
-  if (Number(input.value) === view.a * view.b) go('parent');
+  if (Number(input.value) === view.a * view.b) { const t = view.then; t ? go(t.name, t) : go('parent'); }
   else { input.value = ''; input.placeholder = tr('Try again', 'Cuba lagi'); }
 });
+
+// The add-page text box keeps its words when the screen re-renders (e.g. a new photo).
+app.addEventListener('input', (e) => { if (e.target.id === 'book-text') view.draft = e.target.value; });
 
 app.addEventListener('change', (e) => {
   const t = e.target;
@@ -1138,9 +1212,8 @@ app.addEventListener('change', (e) => {
     state.childName = t.value.trim().slice(0, 20);
     persist();
   } else if (t.id === 'book-photo') {
-    photo = t.files[0] ?? photo;
+    pickPhoto(t.files[0]);
     t.value = '';
-    if (photo) status(tr('Photo ready. Send it to an AI app, or read it on this tablet.', 'Gambar sedia. Hantar ke aplikasi AI, atau baca dalam tablet ini.'));
   } else if (t.id === 'import-file') {
     importFile(t.files[0]);
     t.value = '';
@@ -1150,14 +1223,17 @@ app.addEventListener('change', (e) => {
 // ---------------------------------------------------------------- boot
 
 requestPersist();
-// Text shared in from another app (an AI's reply) goes to the parent area's new-page box.
+// Text shared in from another app (an AI's reply) fills the page being added (Web Share Target).
 const params = new URLSearchParams(location.search);
 const sharedIn = params.get('text') || params.get('title');
+const addingTo = bookById(state.addingTo);
+const inRound = state.inRound && state.paused?.[state.inRound] && findLevel(state.inRound);
 if (sharedIn) {
-  shared = tidyReply(sharedIn, /[一-鿿]/.test(sharedIn) ? 'zh' : 'ms');
   history.replaceState(null, '', location.pathname + (params.has('test') ? '?test' : ''));
-  ACTIONS.gate();
-} else go('home');
+  if (addingTo) go('addPage', { bookId: addingTo.id, draft: tidyReply(sharedIn, addingTo.lang), note: tr('Words from the AI app: check them, then save.', 'Perkataan dari aplikasi AI: semak, kemudian simpan.') });
+  else go('books');
+} else if (inRound) startRound(inRound.subject.id, inRound.idx);
+else go('home');
 
 // Hook for the Playwright tests (only with ?test in the URL): exposes the correct answer.
 if (new URLSearchParams(location.search).has('test')) {

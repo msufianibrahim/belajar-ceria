@@ -125,3 +125,11 @@ test('auto practice: the two furthest open main-path levels not yet mastered, ne
   const early = fromJson({ frontier: { math: 'math-bond5' } });
   assert.ok(!autoPractice(early, math).includes('math-bond5'));
 });
+
+test('old reading pages become one-page books, keeping their page ids', () => {
+  const s = migrate({ books: [{ id: 'b1', title: 'Page 1', lang: 'en', text: 'Sam has a ball.' }, { id: 'k2', title: 'Kancil', lang: 'ms', pages: [{ id: 'b2', text: 'Sang Kancil.' }] }] });
+  assert.deepEqual(s.books, [
+    { id: 'kb1', title: 'Page 1', lang: 'en', pages: [{ id: 'b1', text: 'Sam has a ball.' }] },
+    { id: 'k2', title: 'Kancil', lang: 'ms', pages: [{ id: 'b2', text: 'Sang Kancil.' }] },
+  ]);
+});

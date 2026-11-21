@@ -30,6 +30,10 @@ export function migrate(state) {
     delete st.mathLang;
     delete st.langV;
   }
+  // Reading companion pages became books of pages: each old page is a one-page book
+  // (page ids stay, so the "last read" marks in state.reads still match).
+  state.books = (state.books ?? []).map((b) => (b.pages ? b
+    : { id: `k${b.id}`, title: b.title, lang: b.lang, pages: [{ id: b.id, text: b.text }] }));
   return state;
 }
 

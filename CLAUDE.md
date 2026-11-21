@@ -47,6 +47,7 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
 - Practice medals 🥉🥈🥇 at 10/20/30 rounds of a level: effort, no coins, shown by the avatar.
 - The son is coin-motivated: always show clearly what pays (coin tags on levels).
 - Rounds save after every answer; quitting halfway shows a ▶️ Continue card (state.paused).
+  A page refresh mid-round goes straight back into it (`state.inRound`, set in `go()`).
 
 ## Maths (js/subjects/math.js)
 - English by default (he learns Maths in English at school); app language setting en/ms;
@@ -95,6 +96,12 @@ Healthy, predictable, effort-based. No random rewards, no streaks, session time 
    `state.books`, `state.reads` (last red count). **No coins for reading** — user decided
    (2026-11-15): not for now. **Photo of the page** (js/ocr.js): Tesseract.js 5.1.1 from jsDelivr, on-device
    (msa / eng / chi_sim), fills the text box for the parent to check — user found typing too tedious.
+   **Redesigned (2026-11-21), user's pain points: adding pages, no books.** `state.books` =
+   books of pages `{ id, title, lang, pages: [{ id, text }] }` (old flat pages migrate to one-page
+   books in progress.js). Home always shows 📚 → bookshelf → book (numbered page tiles with ⭐/🔴n)
+   → reading (◀ ▶, after a finished page the big button goes to the next page). **Anyone can add**
+   books/pages (user's choice, no gate); deleting needs the parent gate (`gate` takes `then`).
+   Add-page screen: 1 photo, 2 check words, 3 save. Removed from the parent area.
    User found OCR unreliable (2026-11-21): now the parent picks a photo, then either
    "Send photo to AI app" (Web Share: photo + a question asking for the page's exact words, like
    his LaRas receipt sharing) or "Read photo on this tablet" (OCR). The AI's reply comes back by

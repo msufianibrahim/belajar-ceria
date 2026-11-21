@@ -256,3 +256,28 @@ button:disabled { cursor: default; }
 .read-status { text-align: center; font-weight: 700; min-height: 1.5em; margin: 14px 0; }
 .big-btn.mic.on { background: #ff9e9e; }
 #book-text { width: 100%; box-sizing: border-box; font: inherit; border-radius: 12px; padding: 8px; margin: 6px 0; }
+
+/* ---------- reading companion: bookshelf, book, add page ---------- */
+.shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+.book-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 150px; padding: 16px; border-radius: var(--radius); background: #fff; box-shadow: 0 5px 0 #0002; font: inherit; text-align: left; border-left: 14px solid #7cc6fe; }
+.book-card.new { align-items: center; justify-content: center; border: 3px dashed #0003; background: #fffdf6; font-size: 2rem; box-shadow: none; }
+.book-title { font-size: 1.4rem; font-weight: 800; }
+.book-card small { color: #0008; }
+.center { text-align: center; }
+.panel.form > label.field, .form .field { display: block; font-weight: 700; margin: 8px 0; }
+.form input { display: block; width: 100%; box-sizing: border-box; font: inherit; font-size: 1.4rem; padding: 10px; border-radius: 12px; border: 2px solid #0002; margin-top: 6px; }
+.lang-pick { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.lang-pick .big-btn { flex: 1; min-width: 120px; }
+.lang-pick .big-btn.on { background: #7cc6fe; color: #fff; }
+.pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.page-tile { display: flex; flex-direction: column; align-items: stretch; gap: 6px; }
+.big-btn.page { font-size: 2rem; padding: 14px 6px; display: flex; flex-direction: column; align-items: center; }
+.big-btn.page small { font-size: 1rem; min-height: 1.3em; }
+.btn.subtle { background: none; color: #0007; margin-top: 18px; }
+.step h3 { display: flex; align-items: center; gap: 10px; margin-top: 0; }
+.step-num { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #fff; flex: none; }
+.photo-btn { display: flex; align-items: center; justify-content: center; gap: 12px; cursor: pointer; }
+.photo-btn img { max-height: 120px; max-width: 45%; border-radius: 10px; }
+.step .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.step .row .big-btn { flex: 1; }
+.page-nav { display: flex; justify-content: space-between; margin-top: 12px; }
