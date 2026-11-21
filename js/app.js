@@ -461,12 +461,13 @@ function parentScreen() {
       ${state.books.map((b) => `<div class="task"><span>${langTag(b.lang)} ${esc(b.title)}</span><button class="btn danger" data-act="delBook" data-arg="${b.id}">${tr('Delete', 'Padam')}</button></div>`).join('')}
       <label>${tr('Language', 'Bahasa')} <select id="book-lang">${BOOK_LANGS.map(([v, name]) => `<option value="${v}">${name}</option>`).join('')}</select></label>
       <label class="btn">📷 ${tr('Photo of the page', 'Gambar muka surat')}<input id="book-photo" type="file" accept="image/*" hidden></label>
-      <p class="muted">${tr('Or ask an AI app (Gemini, ChatGPT…): copy the question, paste it there with the photo, copy its reply, then tap Paste reply.', 'Atau tanya aplikasi AI (Gemini, ChatGPT…): salin soalan, tampal di sana bersama gambar, salin jawapannya, kemudian tekan Tampal jawapan.')}</p>
-      <button class="btn" data-act="copyAsk">📋 ${tr('Copy question for AI', 'Salin soalan untuk AI')}</button>
+      <button class="btn" data-act="shareAi">🤖 ${tr('Send photo to AI app', 'Hantar gambar ke aplikasi AI')}</button>
+      <button class="btn" data-act="ocr">🔍 ${tr('Read photo on this tablet', 'Baca gambar dalam tablet ini')}</button>
       <button class="btn" data-act="pasteReply">📥 ${tr('Paste reply', 'Tampal jawapan')}</button>
-      <p class="muted" id="ocr-status">${tr('The words are read on this tablet; check them before adding.', 'Perkataan dibaca dalam tablet ini; semak dulu sebelum tambah.')}</p>
+      <p class="muted" id="ocr-status">${shared ? tr('Words from the AI app: pick the language, check them, then tap Add page.', 'Perkataan dari aplikasi AI: pilih bahasa, semak, kemudian tekan Tambah.')
+        : tr('Take a photo, then send it to an AI app (Gemini, ChatGPT…). Share its reply back to Belajar Ceria, or copy it and tap Paste reply.', 'Ambil gambar, kemudian hantar ke aplikasi AI (Gemini, ChatGPT…). Kongsi jawapannya ke Belajar Ceria, atau salin dan tekan Tampal jawapan.')}</p>
       <label>${tr('Title', 'Tajuk')} <input id="book-title" maxlength="40" placeholder="${tr('Page', 'Muka surat')} ${state.books.length + 1}"></label>
-      <textarea id="book-text" rows="5" maxlength="2000" placeholder="${tr('Type or paste the words on the page', 'Taip atau tampal perkataan pada muka surat')}"></textarea>
+      <textarea id="book-text" rows="5" maxlength="2000" placeholder="${tr('Type or paste the words on the page', 'Taip atau tampal perkataan pada muka surat')}">${esc(shared ?? '')}</textarea>
       <button class="btn" data-act="addBook">➕ ${tr('Add page', 'Tambah muka surat')}</button>
     </section>
     <section class="panel"><h3>${tr('Real-world rewards', 'Hadiah dunia sebenar')}</h3>
@@ -596,22 +597,32 @@ function finishPage(b, res) {
 // For an AI chat app: just the page's words back, so the reply can be pasted straight in.
 const AI_ASK = 'Copy the exact words printed on this book page, in reading order. Reply with only those words: no title of your own, no notes, no translation, no formatting. Keep the original language and spelling.';
 
-async function copyAsk() {
-  const status = app.querySelector('#ocr-status');
-  try {
-    await navigator.clipboard.writeText(AI_ASK);
-    status.textContent = tr('Copied. Paste it in the AI app with the photo.', 'Disalin. Tampal dalam aplikasi AI bersama gambar.');
-  } catch {
-    status.textContent = AI_ASK; // no clipboard access: show it to copy by hand
+let photo = null;        // the page photo the parent picked, until it's sent or read
+let shared = null;       // words another app shared into Belajar Ceria (Web Share Target)
+
+// AI replies may add markdown and links; keep just the words.
+const tidyReply = (text, lang) => cleanText(text.replace(/https?:\/\/\S+/g, '').replace(/[*_#`>]/g, ''), lang).slice(0, 2000);
+const status = (t) => { const el = app.querySelector('#ocr-status'); if (el) el.textContent = t; };
+const needPhoto = () => status(tr('Take or pick a photo of the page first.', 'Ambil atau pilih gambar muka surat dulu.'));
+
+// The share sheet sends the photo and the question together, like sharing a receipt.
+async function shareAi() {
+  if (!photo) return needPhoto();
+  const data = { files: [photo], text: AI_ASK };
+  if (!navigator.canShare?.(data)) {
+    try { await navigator.clipboard.writeText(AI_ASK); } catch {}
+    return status(tr("This browser can't share photos. The question is copied: paste it in the AI app with the photo.", 'Pelayar ini tak boleh kongsi gambar. Soalan sudah disalin: tampal dalam aplikasi AI bersama gambar.'));
   }
+  try {
+    await navigator.share(data);
+    status(tr('Sent. When the AI answers, share its reply to Belajar Ceria, or copy it and tap Paste reply.', 'Dihantar. Bila AI jawab, kongsi jawapannya ke Belajar Ceria, atau salin dan tekan Tampal jawapan.'));
+  } catch {} // he closed the share sheet
 }
 
 async function pasteReply() {
   const box = app.querySelector('#book-text');
   try {
-    const text = await navigator.clipboard.readText();
-    // AI replies may add markdown; strip it like OCR text.
-    box.value = cleanText(text.replace(/[*_#`>]/g, ''), app.querySelector('#book-lang').value).slice(0, 2000);
+    box.value = tidyReply(await navigator.clipboard.readText(), app.querySelector('#book-lang').value);
   } catch {
     box.focus(); // no clipboard access: he pastes with a long press instead
   }
@@ -624,6 +635,7 @@ function addBook() {
   const text = app.querySelector('#book-text').value.trim().slice(0, 2000);
   if (!tokens(text, LISTEN_LANG[lang]).length) return alert(tr('Add the words on the page first.', 'Masukkan perkataan muka surat dulu.'));
   state.books.push({ id: `b${Date.now()}`, title, lang, text });
+  shared = photo = null;
   persist();
   render();
 }
@@ -1053,7 +1065,8 @@ const ACTIONS = {
   mic: () => toggleMic(),
   hear: (_, el) => speak(el.textContent, VOICE[bookById(view.bookId).lang]),
   addBook: () => addBook(),
-  copyAsk: () => copyAsk(),
+  shareAi: () => shareAi(),
+  ocr: () => (photo ? photoToText(photo) : needPhoto()),
   pasteReply: () => pasteReply(),
   delBook: (id) => {
     if (!confirm(tr('Delete this page?', 'Padam muka surat ini?'))) return;
@@ -1125,8 +1138,9 @@ app.addEventListener('change', (e) => {
     state.childName = t.value.trim().slice(0, 20);
     persist();
   } else if (t.id === 'book-photo') {
-    photoToText(t.files[0]);
+    photo = t.files[0] ?? photo;
     t.value = '';
+    if (photo) status(tr('Photo ready. Send it to an AI app, or read it on this tablet.', 'Gambar sedia. Hantar ke aplikasi AI, atau baca dalam tablet ini.'));
   } else if (t.id === 'import-file') {
     importFile(t.files[0]);
     t.value = '';
@@ -1136,7 +1150,14 @@ app.addEventListener('change', (e) => {
 // ---------------------------------------------------------------- boot
 
 requestPersist();
-go('home');
+// Text shared in from another app (an AI's reply) goes to the parent area's new-page box.
+const params = new URLSearchParams(location.search);
+const sharedIn = params.get('text') || params.get('title');
+if (sharedIn) {
+  shared = tidyReply(sharedIn, /[一-鿿]/.test(sharedIn) ? 'zh' : 'ms');
+  history.replaceState(null, '', location.pathname + (params.has('test') ? '?test' : ''));
+  ACTIONS.gate();
+} else go('home');
 
 // Hook for the Playwright tests (only with ?test in the URL): exposes the correct answer.
 if (new URLSearchParams(location.search).has('test')) {

@@ -633,6 +633,7 @@ test('a photo of the page fills in its words for the parent to check', async ({ 
   await page.locator('#book-lang').selectOption('ms');
   const png = Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = c.height = 40; return c.toDataURL('image/png').split(',')[1]; }), 'base64');
   await page.locator('#book-photo').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: png });
+  await page.getByRole('button', { name: /Read photo on this tablet/ }).click();
   await expect(page.locator('#book-text')).toHaveValue('Bola itu berwarna merah.');
   await page.getByRole('button', { name: /Add page/ }).click();
   await expect(page.locator('[data-act="delBook"]')).toHaveCount(1);
@@ -640,18 +641,36 @@ test('a photo of the page fills in its words for the parent to check', async ({ 
 });
 });
 
-test('a page can come from an AI app: copy the question, paste its reply', async ({ page, context, browserName }) => {
-  test.skip(browserName !== 'chromium', 'clipboard permissions are Chromium-only in Playwright');
-  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await open(page);
-  await page.getByRole('button', { name: 'Parents' }).click();
+async function parentArea(page) {
   const [a, b] = (await page.locator('.gate h1').textContent()).match(/\d+/g).map(Number);
   await page.locator('.gate input').fill(String(a * b));
   await page.getByRole('button', { name: 'Enter' }).click();
-  await page.getByRole('button', { name: /Copy question for AI/ }).click();
-  await expect(page.locator('#ocr-status')).toContainText('Copied');
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('exact words');
-  await page.evaluate(() => navigator.clipboard.writeText('**Sam has a red\nball.**'));
-  await page.getByRole('button', { name: /Paste reply/ }).click();
+}
+
+test('a page photo goes to an AI app through the share sheet, with the question', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => {
+    navigator.canShare = () => true;
+    navigator.share = async (d) => { window.__shared = { files: d.files.map((f) => f.name), text: d.text }; };
+  });
+  await page.getByRole('button', { name: 'Parents' }).click();
+  await parentArea(page);
+  await page.getByRole('button', { name: /Send photo to AI app/ }).click();
+  await expect(page.locator('#ocr-status')).toContainText('photo of the page first');
+  await page.locator('#book-photo').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: Buffer.from('x') });
+  await page.getByRole('button', { name: /Send photo to AI app/ }).click();
+  await expect(page.locator('#ocr-status')).toContainText('Sent');
+  const sent = await page.evaluate(() => window.__shared);
+  expect(sent.files).toEqual(['page.png']);
+  expect(sent.text).toContain('exact words');
+});
+
+test("the AI's reply shared back into the app fills the new page, after the parent gate", async ({ page }) => {
+  await page.goto('/?test&text=' + encodeURIComponent('**Sam has a red\nball.**\nhttps://g.co/gemini/share/abc'));
+  await expect(page.locator('.gate')).toBeVisible();
+  await parentArea(page);
   await expect(page.locator('#book-text')).toHaveValue('Sam has a red ball.');
+  await page.getByRole('button', { name: /Add page/ }).click();
+  await expect(page.locator('[data-act="delBook"]')).toHaveCount(1);
+  await expect(page.locator('#book-text')).toHaveValue('');
 });
